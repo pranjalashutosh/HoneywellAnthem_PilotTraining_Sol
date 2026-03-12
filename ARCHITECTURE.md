@@ -9,40 +9,60 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 **What this is NOT:** A production training product, a certified simulator, or a replacement for instructor-led training.
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Browser (React)                             │
-│                                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
-│  │ Cockpit  │  │  Voice   │  │  Drill   │  │   Assessment     │   │
-│  │  Shell   │  │  Panel   │  │  System  │  │   Dashboard      │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┬─────────┘   │
-│       │              │             │                  │             │
-│  ┌────┴──────────────┴─────────────┴──────────────────┴─────────┐  │
-│  │                     Zustand Stores                            │  │
-│  │  cockpit-store │ voice-store │ scenario-store │ assessment    │  │
-│  └────┬──────────────┬─────────────┴──────────────────┬─────────┘  │
-│       │              │                                │             │
-│  ┌────┴──────┐  ┌────┴─────────┐  ┌──────────────────┴─────────┐  │
-│  │ Services  │  │    Voice     │  │     Assessment Engine      │  │
-│  │ pilot-    │  │ recognition  │  │  readback scoring, CBTA    │  │
-│  │ predict   │  │ synthesis    │  │  mapping, latency calc     │  │
-│  └───────────┘  └──────┬───────┘  └────────────────────────────┘  │
-│                        │                                           │
-└────────────────────────┼───────────────────────────────────────────┘
-                         │ HTTP / WebSocket
-┌────────────────────────┼───────────────────────────────────────────┐
-│              Express API Proxy (localhost:3001)                     │
-│                        │                                           │
-│  ┌─────────────┐  ┌────┴────────┐  ┌───────────────────────────┐  │
-│  │ /api/atc    │  │ /api/tts    │  │ /api/stt/token            │  │
-│  │ Claude API  │  │ ElevenLabs  │  │ Deepgram temp auth token  │  │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────┬─────────────┘  │
-│         │                │                        │                │
-└─────────┼────────────────┼────────────────────────┼────────────────┘
-          │                │                        │
-          ▼                ▼                        ▼
-   Anthropic API    ElevenLabs API          Deepgram API
-   (Claude 4.5)    (Text-to-Speech)   (Nova-2 Streaming STT)
+┌──────────────────────────────────────────────────────────────────────┐
+│                   Browser (React + LiveKit JS SDK)                    │
+│                                                                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────────┐   │
+│  │ Cockpit  │  │  Voice   │  │  Drill   │  │  Assessment       │   │
+│  │  Shell   │  │  Panel   │  │  System  │  │  Dashboard        │   │
+│  │          │  │          │  │          │  │  (shadcn/ui Charts)│   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┬──────────┘   │
+│       │              │             │                  │              │
+│  ┌────┴──────────────┴─────────────┴──────────────────┴──────────┐  │
+│  │                      Zustand Stores                            │  │
+│  │  cockpit │ voice │ scenario │ assessment │ pilot │ ui          │  │
+│  └──────────┬──────────────────────┬─────────────────────────────┘  │
+│             │                      │                                │
+│   LiveKit JS SDK               Supabase JS SDK                     │
+│   (room, audio tracks,         (@supabase/supabase-js)             │
+│    data channel for PTT,        CRUD, analytics RPC,               │
+│    receives transcripts +        Edge Functions for                 │
+│    biomarker scores)             Claude API + LiveKit tokens        │
+│             │                      │                                │
+└─────────────┼──────────────────────┼────────────────────────────────┘
+              │ WebRTC               │ HTTPS
+              ▼                      ▼
+┌─────────────────────┐   ┌────────────────────────────────────────┐
+│   LiveKit Cloud     │   │           Supabase Cloud               │
+│                     │   │                                        │
+│   ┌─────────────┐   │   │  ┌──────────────┐  ┌──────────────┐   │
+│   │ SFU Router  │   │   │  │  PostgreSQL   │  │Edge Functions│   │
+│   │ STUN/TURN   │   │   │  │  - pilots     │  │  - /atc      │   │
+│   │ Edge Nodes  │   │   │  │  - sessions   │  │    (Claude)  │   │
+│   └──────┬──────┘   │   │  │  - drill_res  │  │  - /livekit  │   │
+│          │          │   │  │  - readbacks   │  │    (tokens)  │   │
+│          ▼          │   │  │  - baselines   │  └──────────────┘   │
+│   ┌─────────────┐   │   │  │  - RPC funcs   │                    │
+│   │ Agent Worker│   │   │  └──────────────┘                      │
+│   │  (Python)   │   │   └────────────────────────────────────────┘
+│   │             │   │
+│   │ ┌─────────┐ │   │
+│   │ │Deepgram │ │   │
+│   │ │Nova-2   │ │   │
+│   │ │STT      │ │   │
+│   │ ├─────────┤ │   │
+│   │ │Eleven-  │ │   │
+│   │ │Labs TTS │ │   │
+│   │ ├─────────┤ │   │
+│   │ │Voice    │ │   │
+│   │ │Analysis │ │   │
+│   │ │(librosa)│ │   │
+│   │ │F0, RMS, │ │   │
+│   │ │MFCC,    │ │   │
+│   │ │spectral │ │   │
+│   │ └─────────┘ │   │
+│   └─────────────┘   │
+└─────────────────────┘
 ```
 
 ---
@@ -55,144 +75,159 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 | UI | React 18 + TypeScript | Component model maps naturally to panel-based cockpit layout |
 | Styling | Tailwind CSS 4 + CSS variables | Rapid dark aviation theme with design tokens |
 | State | Zustand | Domain-sliced stores, surgical re-renders for cockpit panels |
-| Voice STT | Deepgram (Nova-2) | Streaming WebSocket, word-level timestamps, keyword boosting |
-| Voice TTS | ElevenLabs (Web SpeechSynthesis fallback) | Realistic ATC voice quality |
+| Charts | shadcn/ui Charts (Recharts) | Radar charts for CBTA, CSS variable theming, copy-paste ownership, TypeScript ChartConfig |
+| Audio infra | LiveKit Cloud + JS SDK | WebRTC transport, STUN/TURN, room management, agent dispatch |
+| Agent runtime | LiveKit Agents (Python) | STT/TTS/voice analysis pipeline, raw audio frame access |
+| Voice STT | Deepgram Nova-2 (LiveKit plugin) | Native streaming, per-word confidence + timestamps, keyword boosting |
+| Voice TTS | ElevenLabs (LiveKit plugin) | Realistic ATC voice quality |
+| Voice analysis | librosa + numpy (Python agent) | F0 (yin/pyin), RMS, MFCC, spectral — all in one pipeline, research-grade |
 | LLM | Claude API (@anthropic-ai/sdk) | Contextual ATC instruction generation with scenario awareness |
-| Charts | Recharts | Radar chart for CBTA competency visualization |
-| Package manager | pnpm | Fast, strict dependency resolution |
-| API proxy | Express (minimal) | Keeps API keys server-side |
-| Persistence | localStorage | Prototype-grade; same data shapes can lift into DB later |
+| Backend | Supabase (Postgres + Edge Functions) | Managed DB, auto-generated REST API, Edge Functions for server-side secrets |
+| Package manager | pnpm (app) + pip/uv (agent) | Respective ecosystems |
 
 ---
 
 ## Directory Structure
 
 ```
-app/
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-├── index.html
-├── .env.example              # ANTHROPIC_API_KEY, ELEVENLABS_API_KEY, DEEPGRAM_API_KEY
-├── .gitignore
+/Users/ashutoshpranjal/HPT_Sol/
+├── CLAUDE.md
+├── ARCHITECTURE.md
+├── Metrics_research.md
+├── README.md
+├── brain_StormDocuments/
 │
-├── server/                   # Express API proxy (runs on :3001)
-│   ├── index.ts              # Server entry point, CORS, middleware
-│   ├── routes/
-│   │   ├── atc.ts            # POST /api/atc — Claude API proxy for ATC generation
-│   │   ├── tts.ts            # POST /api/tts — ElevenLabs text-to-speech proxy
-│   │   └── stt.ts            # GET /api/stt/token — Deepgram temporary auth token
+├── agent/                          # LiveKit Agent Worker (Python)
+│   ├── requirements.txt            # livekit-agents, livekit-plugins-deepgram, librosa, numpy
+│   ├── worker.py                   # Agent entry point + room lifecycle
+│   ├── stt.py                      # Deepgram Nova-2 via LiveKit STT plugin
+│   ├── tts.py                      # ElevenLabs TTS via LiveKit TTS plugin + radio static overlay
+│   ├── voice_analysis.py           # F0, RMS, MFCC, spectral (all librosa)
+│   ├── assessment.py               # Confidence-weighted scoring, latency decomposition
 │   └── prompts/
-│       └── atc-system.ts     # ATC controller persona system prompt
+│       └── atc_system.py           # ATC controller persona prompt
 │
-├── public/
-│   └── audio/                # PTT click sound, radio static effect
+├── supabase/                       # Supabase project config
+│   ├── config.toml                 # Supabase CLI config
+│   ├── migrations/                 # PostgreSQL schema migrations
+│   │   └── 001_initial_schema.sql  # pilots, sessions, drill_results, readback_scores, baselines
+│   ├── functions/                  # Edge Functions (Deno)
+│   │   ├── atc/index.ts            # Claude API proxy (ANTHROPIC_API_KEY)
+│   │   └── livekit-token/index.ts  # LiveKit room token generation
+│   └── seed.sql                    # Sample drill data (optional)
 │
-└── src/
-    ├── main.tsx              # React entry point
-    ├── App.tsx               # Root component with tab routing
-    ├── globals.css           # Anthem CSS variables and base styles
-    │
-    ├── types/                # TypeScript type definitions
-    │   ├── scenario.ts       # Drill definitions, events, phases
-    │   ├── assessment.ts     # Scores, CBTA metrics, session history
-    │   ├── cockpit.ts        # Waypoints, frequencies, modes, flight plan
-    │   ├── voice.ts          # Transcript entries, voice state, Deepgram types
-    │   └── atc.ts            # ATC instruction, expected readback, context
-    │
-    ├── stores/               # Zustand state stores
-    │   ├── cockpit-store.ts  # Active flight plan, frequencies, selected mode
-    │   ├── scenario-store.ts # Active drill, current phase, event queue
-    │   ├── voice-store.ts    # Transcripts, PTT state, interim results
-    │   ├── assessment-store.ts # Scores, session history, CBTA aggregates
-    │   └── ui-store.ts       # Active tab, panel visibility, modal state
-    │
-    ├── services/             # Core business logic (no React dependency)
-    │   ├── atc-engine.ts     # Claude API integration for ATC generation
-    │   ├── voice-recognition.ts  # Deepgram streaming STT wrapper
-    │   ├── voice-synthesis.ts    # ElevenLabs + fallback TTS wrapper
-    │   ├── assessment-engine.ts  # Scoring logic (readback, decision, CBTA)
-    │   ├── scenario-runner.ts    # Drill lifecycle manager
-    │   └── pilot-predict.ts      # Predictive input suggestion logic
-    │
-    ├── hooks/                # React hooks wrapping services
-    │   ├── useATCEngine.ts       # ATC generation + streaming response
-    │   ├── useDeepgram.ts        # WebSocket lifecycle + interim results
-    │   ├── useVoiceSynthesis.ts  # TTS playback with completion callback
-    │   ├── useDrillRunner.ts     # Drill lifecycle orchestration
-    │   ├── useTimer.ts           # Countdown / elapsed timer
-    │   └── usePilotPredict.ts    # Suggestion trigger + accept/reject
-    │
-    ├── lib/                  # Pure utilities
-    │   ├── anthem-theme.ts   # Theme constants and helpers
-    │   ├── scoring.ts        # Fuzzy match, LCS, token comparison
-    │   ├── audio-utils.ts    # Audio context, PTT click, radio static
-    │   └── storage.ts        # localStorage wrapper with typed keys
-    │
-    ├── data/                 # Static data (drills are data, not code)
-    │   ├── drills/           # 6 drill scenario definitions
-    │   │   ├── descent-conflict.ts
-    │   │   ├── weather-diversion.ts
-    │   │   ├── predict-wrong-freq.ts
-    │   │   ├── runway-change.ts
-    │   │   ├── holding-pattern.ts
-    │   │   └── comms-handoff.ts
-    │   ├── flight-plans/     # Sample routes
-    │   │   ├── kjfk-kbos.ts
-    │   │   └── kteb-kpbi.ts
-    │   ├── frequencies.ts    # ATC frequencies by facility
-    │   ├── waypoints.ts      # Waypoint database
-    │   └── phraseology.ts    # ICAO standard templates for scoring
-    │
-    └── components/
-        ├── layout/           # Page-level structure
-        │   ├── CockpitShell.tsx   # Main cockpit frame (dark bg, panel grid)
-        │   ├── TopNavBar.tsx      # Tab navigation + session info
-        │   └── StatusBar.tsx      # Clock, active freq, drill status
-        │
-        ├── panels/           # Cockpit instrument panels
-        │   ├── FlightPlanPanel.tsx   # Flight plan display + editing
-        │   ├── RadiosPanel.tsx       # Frequency tuning + COM/NAV
-        │   ├── WaypointRow.tsx       # Single waypoint in flight plan
-        │   ├── WaypointEditor.tsx    # Inline waypoint constraint editor
-        │   └── FrequencyTuner.tsx    # Touch-based frequency selector
-        │
-        ├── controls/         # Cockpit control elements
-        │   ├── ModeSelectionBar.tsx    # NAV/APR/HDG/ALT mode buttons
-        │   ├── TouchNumpad.tsx        # Numeric input overlay
-        │   ├── TouchKeyboard.tsx      # Alpha input overlay
-        │   ├── PilotPredict.tsx       # Predictive scratchpad
-        │   └── PredictSuggestion.tsx  # Individual suggestion chip
-        │
-        ├── voice/            # Voice communication interface
-        │   ├── VoicePanel.tsx         # Voice section container
-        │   ├── PTTButton.tsx          # Push-to-talk button
-        │   ├── TranscriptDisplay.tsx  # Scrolling conversation log
-        │   └── VoiceStatus.tsx        # Connection/recording indicator
-        │
-        ├── drill/            # Drill execution interface
-        │   ├── DrillSelector.tsx      # Drill picker grid
-        │   ├── DrillCard.tsx          # Individual drill summary card
-        │   ├── DrillBriefing.tsx      # Pre-drill briefing screen
-        │   ├── DrillTimer.tsx         # Countdown / elapsed timer display
-        │   ├── DecisionPrompt.tsx     # Timed decision-point modal
-        │   └── DrillOutcome.tsx       # Post-drill results screen
-        │
-        ├── assessment/       # Assessment and scoring views
-        │   ├── AssessmentDashboard.tsx  # Main assessment view
-        │   ├── CompetencyRadar.tsx      # CBTA radar chart (Recharts)
-        │   ├── DrillMetricsCard.tsx     # Metrics for a single drill run
-        │   └── SessionSummary.tsx       # Aggregate session stats
-        │
-        └── shared/           # Reusable UI primitives
-            ├── AnthemButton.tsx   # Styled button (touch-optimized)
-            ├── AnthemCard.tsx     # Styled card container
-            └── AnthemInput.tsx    # Styled input field
+├── app/                            # Frontend (NO server/ directory)
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── index.html
+│   ├── .env.example                # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_LIVEKIT_URL
+│   └── src/
+│       ├── lib/
+│       │   ├── supabase.ts         # Supabase client init
+│       │   ├── scoring.ts          # Simplified (server-side primary)
+│       │   ├── audio-utils.ts      # Simplified (LiveKit SDK handles audio)
+│       │   └── storage.ts          # Offline fallback (localStorage)
+│       ├── services/
+│       │   ├── livekit-client.ts   # LiveKit room setup, PTT data channel
+│       │   ├── atc-engine.ts       # Calls Supabase Edge Function instead of Express
+│       │   ├── assessment-engine.ts # Simplified — heavy lifting in Python agent
+│       │   ├── scenario-runner.ts  # Drill lifecycle manager
+│       │   ├── pilot-predict.ts    # Predictive input suggestion logic
+│       │   └── api-client.ts       # Supabase SDK calls instead of fetch()
+│       ├── hooks/
+│       │   ├── useLiveKit.ts       # Room connection, track subscription
+│       │   ├── useATCEngine.ts     # ATC generation + streaming response
+│       │   ├── useDrillRunner.ts   # Drill lifecycle orchestration
+│       │   ├── useTimer.ts         # Countdown / elapsed timer
+│       │   └── usePilotPredict.ts  # Suggestion trigger + accept/reject
+│       ├── components/
+│       │   ├── layout/
+│       │   │   ├── CockpitShell.tsx
+│       │   │   ├── TopNavBar.tsx
+│       │   │   └── StatusBar.tsx
+│       │   ├── panels/
+│       │   │   ├── FlightPlanPanel.tsx
+│       │   │   ├── RadiosPanel.tsx
+│       │   │   ├── WaypointRow.tsx
+│       │   │   ├── WaypointEditor.tsx
+│       │   │   └── FrequencyTuner.tsx
+│       │   ├── controls/
+│       │   │   ├── ModeSelectionBar.tsx
+│       │   │   ├── TouchNumpad.tsx
+│       │   │   ├── TouchKeyboard.tsx
+│       │   │   ├── PilotPredict.tsx
+│       │   │   └── PredictSuggestion.tsx
+│       │   ├── voice/
+│       │   │   ├── VoicePanel.tsx
+│       │   │   ├── PTTButton.tsx
+│       │   │   ├── TranscriptDisplay.tsx
+│       │   │   └── VoiceStatus.tsx
+│       │   ├── drill/
+│       │   │   ├── DrillSelector.tsx
+│       │   │   ├── DrillCard.tsx
+│       │   │   ├── DrillBriefing.tsx
+│       │   │   ├── DrillTimer.tsx
+│       │   │   ├── DecisionPrompt.tsx
+│       │   │   └── DrillOutcome.tsx
+│       │   ├── assessment/           # Dashboard uses shadcn/ui Charts
+│       │   │   ├── AssessmentDashboard.tsx
+│       │   │   ├── CBTARadar.tsx      # Radar chart (shadcn/ui)
+│       │   │   ├── DrillHistory.tsx   # Bar/line chart
+│       │   │   ├── TrendChart.tsx     # Line chart (competency over time)
+│       │   │   ├── CohortCompare.tsx  # Grouped bars + percentile
+│       │   │   ├── CognitiveLoadIndicator.tsx
+│       │   │   ├── SessionSummary.tsx # KPI cards (shadcn/ui Card)
+│       │   │   └── ExportButton.tsx
+│       │   └── shared/
+│       │       ├── AnthemButton.tsx
+│       │       ├── AnthemCard.tsx
+│       │       ├── AnthemInput.tsx
+│       │       └── PilotSelector.tsx
+│       ├── types/
+│       │   ├── scenario.ts
+│       │   ├── assessment.ts
+│       │   ├── cockpit.ts
+│       │   ├── voice.ts
+│       │   ├── atc.ts
+│       │   ├── cognitive-load.ts
+│       │   ├── latency.ts
+│       │   ├── pilot.ts
+│       │   └── analytics.ts
+│       ├── stores/
+│       │   ├── cockpit-store.ts
+│       │   ├── scenario-store.ts
+│       │   ├── voice-store.ts
+│       │   ├── assessment-store.ts
+│       │   ├── pilot-store.ts
+│       │   └── ui-store.ts
+│       └── data/
+│           ├── drills/
+│           │   ├── descent-conflict.ts
+│           │   ├── weather-diversion.ts
+│           │   ├── predict-wrong-freq.ts
+│           │   ├── runway-change.ts
+│           │   ├── holding-pattern.ts
+│           │   └── comms-handoff.ts
+│           ├── flight-plans/
+│           │   ├── kjfk-kbos.ts
+│           │   └── kteb-kpbi.ts
+│           ├── frequencies.ts
+│           ├── waypoints.ts
+│           └── phraseology.ts
 ```
 
 ---
 
-## Deepgram STT Integration
+## Deepgram STT — LiveKit Agent Plugin
+
+### Why Deepgram as Sole STT Provider
+
+Deepgram Nova-2 runs as a LiveKit STT plugin inside the Python agent worker. It is the sole STT provider.
+
+**Dual STT evaluation and rejection:** Whisper-ATC + Deepgram dual STT was evaluated and rejected. Whisper-ATC requires a self-hosted GPU runtime (faster-whisper), adds Python complexity for marginal prototype benefit. Deepgram provides everything the prototype needs: native streaming (<100ms latency), per-word confidence scores, per-word timestamps, and keyword boosting for aviation terminology.
+
+The ~8-10% pilot WER is acceptable for this prototype. Confidence-weighted scoring (see Assessment Engine) compensates for STT imperfection by excluding low-confidence words from pilot scoring.
 
 ### Why Deepgram Over Web Speech API
 
@@ -203,121 +238,109 @@ app/
 | Word timestamps | Per-word ms-level timestamps | Not available |
 | Keyword boosting | Boost aviation terms (callsigns, waypoints) | Not supported |
 | Browser support | All browsers (WebSocket) | Chrome-only reliable |
-| API key security | Server-side token provisioning | N/A (browser-native) |
+| API key security | Server-side in Python agent | N/A (browser-native) |
 
-### Connection Flow
+### Keyword Boosting Configuration
 
+Keyword boosting is configured in the Python agent (`agent/stt.py`), not browser-side. The agent receives the active drill's keyword list via LiveKit data channel at drill start and applies it to the Deepgram connection.
+
+```python
+# agent/stt.py — Deepgram Nova-2 via LiveKit STT plugin
+deepgram_options = {
+    "model": "nova-2",
+    "language": "en",
+    "smart_format": True,
+    "punctuate": False,          # Aviation comms don't use punctuation
+    "interim_results": True,     # Show live transcript as pilot speaks
+    "utterance_end_ms": 1500,    # Detect end of utterance for auto-commit
+    "channels": 1,
+    "sample_rate": 16000,
+    "encoding": "linear16",
+    # Dynamic per-drill keyword boosting:
+    "keywords": [
+        "flight level",
+        "descend and maintain",
+        "climb and maintain",
+        "roger",
+        "wilco",
+        "squawk",
+        "approach",
+        "departure",
+        "tower",
+        "ground",
+        # + injected per drill: callsign, active frequencies, waypoint IDs
+    ],
+}
 ```
-1. Pilot presses PTT button
-       ↓
-2. Browser calls GET /api/stt/token on Express proxy
-       ↓
-3. Express proxy calls Deepgram API to create temporary auth token
-   (scoped, short-lived, limited permissions)
-       ↓
-4. Token returned to browser
-       ↓
-5. Browser opens WebSocket directly to Deepgram using temp token
-   wss://api.deepgram.com/v1/listen?model=nova-2&...
-       ↓
-6. Browser captures mic audio via MediaRecorder API (16kHz, mono, linear16)
-       ↓
-7. Audio chunks streamed to Deepgram via WebSocket
-       ↓
-8. Deepgram returns messages:
-   - { type: "Results", is_final: false, ... } → interim transcript
-   - { type: "Results", is_final: true, ... }  → final transcript with word timestamps
-       ↓
-9. voice-recognition.ts processes results → updates voice-store
-       ↓
-10. Pilot releases PTT → WebSocket closed → final transcript committed
-       ↓
-11. assessment-engine.ts scores readback using final transcript + timestamps
-```
 
-### Deepgram Connection Configuration
+### Latency Measurement — Agent-Side Decomposition
+
+Response latency is decomposed into pilot cognitive time and system overhead. The pilot's score is based **only** on locally-measured values — no network dependency.
+
+PTT press and release events are communicated from the browser to the Python agent via LiveKit data channel messages (`PTT_START` / `PTT_END`). The agent captures raw audio frames from the pilot's audio track and detects speech onset server-side using RMS threshold analysis on the incoming frames.
+
+**Latency decomposition:**
+- `pilotReactionMs` = PTT press timestamp - ATC audio end timestamp (purely local browser measurement)
+- `speechOnsetMs` = speech onset timestamp - PTT press timestamp (agent-side detection on raw audio frames)
 
 ```typescript
-// Options passed when opening the Deepgram WebSocket
-const deepgramOptions = {
-  model: "nova-2",
-  language: "en",
-  smart_format: true,
-  punctuate: false,          // Aviation comms don't use punctuation
-  interim_results: true,     // Show live transcript as pilot speaks
-  utterance_end_ms: 1500,    // Detect end of utterance for auto-commit
-  channels: 1,
-  sample_rate: 16000,
-  encoding: "linear16",
-  // Dynamic per-drill keyword boosting:
-  keywords: [
-    "flight level",
-    "descend and maintain",
-    "climb and maintain",
-    "roger",
-    "wilco",
-    "squawk",
-    "approach",
-    "departure",
-    "tower",
-    "ground",
-    // + injected per drill: callsign, active frequencies, waypoint IDs
-  ],
-};
+// Latency decomposition — pilotReactionMs is local browser, speechOnsetMs from agent
+interface LatencyDecomposition {
+  // Pilot cognitive latency (used for scoring)
+  pilotReactionMs: number;       // atcAudioEnd → PTT press (purely local)
+  speechOnsetMs: number;         // PTT press → first voiced sound (agent-side detection)
+  totalPilotLatencyMs: number;   // Sum of above — the assessment score input
+
+  // System overhead (displayed for transparency, NOT in scoring)
+  networkLatencyMs: number;      // Calibrated WebRTC round-trip estimate
+  deepgramProcessingMs: number;  // Estimated Deepgram overhead
+
+  // Raw values for debugging
+  atcAudioEndTimestamp: number;
+  pttPressTimestamp: number;
+  localSpeechOnsetTimestamp: number;  // From agent-side detection via data channel
+  deepgramFirstWordStart: number;     // Cross-check only
+}
 ```
 
-### Latency Measurement
-
-Deepgram provides per-word timestamps in its final transcript response. This enables precise response latency measurement:
-
-```typescript
-// After TTS plays ATC instruction:
-const atcSpeakEnd: number = Date.now(); // When TTS audio finishes
-
-// After Deepgram returns final transcript:
-const firstWordStart: number = deepgramResult.channel.alternatives[0].words[0].start;
-// firstWordStart is relative to the start of the audio stream
-
-// Combined with the PTT press timestamp:
-const pttPressTime: number = voiceStore.pttPressTimestamp;
-const responseLatency: number = pttPressTime - atcSpeakEnd;
-// Plus: time from PTT press to first word (Deepgram word[0].start) for speech onset
-
-// Assessment thresholds (from Report B):
-// > 400ms onset after PTT: normal
-// < 400ms: possibly pre-rehearsed or overlapping
-// > 3000ms: elevated cognitive load indicator
-```
+**Assessment thresholds (from FAA research / Report B):**
+- < 200ms speech onset: possibly pre-rehearsed (noted, not penalized)
+- 200-400ms: normal reaction time
+- 400-3000ms: acceptable but elevated
+- \> 3000ms: cognitive load indicator → WLM competency impact
 
 ---
 
-## ElevenLabs TTS Integration
+## ElevenLabs TTS — LiveKit TTS Plugin
 
 ### Architecture
 
+ATC instruction audio is generated and delivered through the LiveKit agent pipeline:
+
 ```
-atc-engine.ts generates instruction text
+1. ATC instruction text generated (via Claude API / Supabase Edge Function)
        ↓
-voice-synthesis.ts sends text to Express proxy
+2. Instruction text sent to Python agent via LiveKit data channel
        ↓
-POST /api/tts { text, voice_id }
+3. Agent sends text to ElevenLabs via LiveKit TTS plugin
        ↓
-Express proxy calls ElevenLabs API with server-side key
+4. Agent applies radio static overlay before/after speech frames
        ↓
-Returns audio/mpeg stream
+5. Audio frames played into the LiveKit room as an audio track
        ↓
-Browser plays via AudioContext
+6. Browser hears ATC instruction via LiveKit audio track subscription
        ↓
-On playback complete → triggers PTT availability + starts latency timer
+7. On playback complete → agent sends ATC_SPEAK_END via data channel
+   → browser starts latency timer, PTT becomes available
 ```
 
 ### Fallback
 
-If ElevenLabs API is unavailable or no API key configured, falls back to `window.speechSynthesis` (Web Speech API TTS). Quality is lower but functional for development and demo without API keys.
+If ElevenLabs API is unavailable or no API key configured, the browser falls back to `window.speechSynthesis` (Web SpeechSynthesis). Quality is lower but functional for development and demo without API keys.
 
 ### Voice Selection
 
-Uses a male voice with moderate pace and slightly clipped cadence to simulate ATC radio communication style. Radio static audio overlay applied before and after speech to reinforce the communication context.
+Uses a male voice with moderate pace and slightly clipped cadence to simulate ATC radio communication style. Radio static audio overlay applied by the agent before and after speech to reinforce the communication context.
 
 ---
 
@@ -325,7 +348,7 @@ Uses a male voice with moderate pace and slightly clipped cadence to simulate AT
 
 ### System Prompt Design
 
-The ATC persona prompt (`server/prompts/atc-system.ts`) establishes:
+The ATC persona prompt (`agent/prompts/atc_system.py`) establishes:
 
 - **Role:** TRACON or Center controller for the scenario's airspace
 - **Facility and sector:** Derived from the drill's geographic context
@@ -336,12 +359,13 @@ The ATC persona prompt (`server/prompts/atc-system.ts`) establishes:
 
 ### Request Flow
 
+ATC generation requests go through a Supabase Edge Function (`supabase/functions/atc/index.ts`), which holds the `ANTHROPIC_API_KEY` server-side.
+
 ```typescript
-// atc-engine.ts
+// atc-engine.ts — calls Supabase Edge Function
 async function generateATCInstruction(context: ATCContext): Promise<ATCInstruction> {
-  const response = await fetch('/api/atc', {
-    method: 'POST',
-    body: JSON.stringify({
+  const { data } = await supabase.functions.invoke('atc', {
+    body: {
       systemPrompt: buildSystemPrompt(context.facility, context.sector),
       messages: context.conversationHistory,
       drillConstraints: context.drill.atcConstraints,
@@ -352,9 +376,10 @@ async function generateATCInstruction(context: ATCContext): Promise<ATCInstructi
         frequency: context.frequency,
         phase: context.flightPhase,
       },
-    }),
+    },
   });
   // Returns: { instruction: string, expectedReadback: string, requiredActions: Action[] }
+  return data;
 }
 ```
 
@@ -408,29 +433,46 @@ interface VoiceStore {
   isRecording: boolean;
   isATCSpeaking: boolean;
   interimTranscript: string;
-  transcriptHistory: TranscriptEntry[];
+  transcriptHistory: TranscriptEntry[]; // Now includes ConfidenceAnnotatedWord[]
   pttPressTimestamp: number | null;
   atcSpeakEndTimestamp: number | null;
-  deepgramConnected: boolean;
+  localSpeechOnsetTimestamp: number | null; // From agent via data channel
+  livekitConnected: boolean;
   // Actions
   pressPTT: () => void;
   releasePTT: () => void;
   setInterimTranscript: (text: string) => void;
   commitTranscript: (entry: TranscriptEntry) => void;
   setATCSpeaking: (speaking: boolean) => void;
+  setLocalSpeechOnset: (timestamp: number) => void;
 }
 
 // assessment-store.ts — Scoring and metrics
 interface AssessmentStore {
   currentDrillMetrics: DrillMetrics | null;
   sessionHistory: DrillResult[];
-  cbta: CBTAScores; // COM, WLM, SAW, KNO, PSD, FPM — each 0-100
+  cbta: CBTAScores;
+  cognitiveLoadBaseline: CognitiveLoadBaseline | null;
+  currentEventCognitiveLoad: CognitiveLoadScore[];
+  activePilotId: string | null;
   // Actions
   recordReadbackScore: (score: ReadbackScore) => void;
+  recordCognitiveLoadScore: (score: CognitiveLoadScore) => void;
   recordDecisionScore: (score: DecisionScore) => void;
   recordTouchScore: (score: TouchScore) => void;
   finalizeDrillMetrics: () => void;
-  loadFromStorage: () => void;
+  loadFromServer: (pilotId: string) => Promise<void>;   // Loads from Supabase
+  saveToServer: () => Promise<void>;                     // Saves to Supabase
+}
+
+// pilot-store.ts — Active pilot profile
+interface PilotStore {
+  activePilot: PilotProfile | null;
+  pilots: PilotProfile[];
+  // Actions
+  selectPilot: (id: string) => void;
+  createPilot: (profile: Omit<PilotProfile, 'id' | 'createdAt' | 'lastActiveAt'>) => Promise<void>;
+  loadPilots: () => Promise<void>;
 }
 
 // ui-store.ts — UI state
@@ -585,31 +627,128 @@ const descentConflict: DrillDefinition = {
 
 ## Assessment Engine
 
-### Readback Scoring
+### Readback Scoring — Confidence-Weighted
 
-Uses fuzzy token comparison with critical-element weighting. Even with Deepgram's improved accuracy, STT isn't perfect — the scoring algorithm accounts for transcription errors.
+Uses confidence-weighted fuzzy token comparison. Deepgram's per-word confidence scores prevent STT errors from being scored as pilot errors. See `Metrics_research.md` for full empirical justification.
 
 ```typescript
 interface ReadbackScore {
-  accuracy: number;         // 0-100, weighted token match
-  latency: number;          // ms, from ATC speak end to pilot first word
-  phraseology: number;      // 0-100, ICAO standard phrase adherence
-  callsignCorrect: boolean; // Did pilot include correct callsign?
-  criticalElements: {       // Per-element scoring
-    element: string;        // e.g., "FL240", "descend and maintain"
+  rawAccuracy: number;                  // 0-100, original LCS score (for reference)
+  confidenceAdjustedAccuracy: number;   // 0-100, used for CBTA rollup
+  latency: LatencyDecomposition;        // Agent-side decomposition (see Latency section)
+  phraseology: number;                  // 0-100, ICAO standard phrase adherence
+  callsignCorrect: boolean;
+  transcriptConfidence: number;         // Mean Deepgram confidence for transcript
+  estimatedWER: number;                 // Estimated WER for this transcript
+  scoringBasis: 'confident' | 'uncertain' | 'abstained';
+  uncertainElements: UncertainElement[];
+  criticalElements: {
+    element: string;
     matched: boolean;
-    weight: number;         // Critical elements weighted higher
+    weight: number;
+    matchConfidence: number;  // Deepgram confidence of the matching word
+    discounted: boolean;      // True if excluded due to low STT confidence
   }[];
+}
+
+interface UncertainElement {
+  element: string;           // The critical element (e.g., "FL240")
+  transcribedAs: string;     // What Deepgram heard
+  confidence: number;        // Deepgram confidence
+  flaggedForReview: boolean; // Marked for instructor review
 }
 ```
 
+**Confidence tiers:**
+
+| Tier | Deepgram Confidence | Scoring Treatment |
+|------|-------------------|-------------------|
+| High | >= 0.85 | Full weight (1.0x) in scoring |
+| Medium | 0.60-0.84 | Half weight (0.5x) |
+| Low | < 0.60 | Excluded (0.0x), flagged for instructor review |
+
+**Abstention rule:** If mean transcript confidence < 0.50 OR > 40% of words are low-confidence → `scoringBasis: 'abstained'`. Score is NOT counted toward CBTA rollup. UI shows: "Transcript quality too low — instructor review required."
+
+**Estimated WER per transcript:**
+```
+estimatedWER ≈ Σ(1 - confidence_i) / totalWords
+```
+
 **Scoring algorithm:**
-1. Tokenize expected readback and actual transcript
+1. Tokenize expected readback and actual transcript (with confidence annotations)
 2. Identify critical elements (altitudes, headings, frequencies, callsign) — weight 2x
-3. Run longest common subsequence (LCS) on token sequences
-4. Calculate weighted match percentage
-5. Apply phraseology bonus for standard ICAO phrasing
-6. Deduct for incorrect or omitted callsign
+3. Run LCS on token sequences
+4. In scoring phase, weight each token match/mismatch by its confidence tier
+5. Low-confidence mismatches → zero penalty (likely STT error, not pilot error)
+6. High-confidence mismatches → full penalty (likely real pilot error)
+7. Apply phraseology bonus for standard ICAO phrasing
+8. Deduct for incorrect or omitted callsign
+9. Report both raw and confidence-adjusted scores
+
+### Voice Biomarker Extraction — Cognitive Load Measurement
+
+All voice biomarker extraction happens in the Python agent via librosa and numpy. See `Metrics_research.md` for complete empirical evidence and weight derivation.
+
+**Audio capture pipeline:**
+```
+LiveKit Room → Agent Worker receives pilot's audio track
+  ├── Audio → Deepgram Nova-2 STT (streaming, per-word confidence + timestamps)
+  └── Raw audio frames → librosa (F0, RMS, MFCC, spectral extraction)
+                        → numpy (smoothing, octave correction)
+                        → Assessment scores → data channel → browser
+```
+
+**Extraction methods (all in `agent/voice_analysis.py`):**
+- **F0 extraction:** `librosa.yin()` or `librosa.pyin()` on raw PCM (16kHz)
+- **RMS intensity:** `librosa.feature.rms()`
+- **MFCC:** `librosa.feature.mfcc()` for voice quality characterization
+- **Spectral features:** `librosa.feature.spectral_centroid()`, `spectral_rolloff()`, `spectral_flatness()`
+
+The agent receives raw audio frames from LiveKit, processes them through the librosa pipeline, and sends computed scores to the browser via LiveKit data channel.
+
+```typescript
+interface VoiceBiomarkers {
+  f0Mean: number;            // Hz — fundamental frequency mean
+  f0Peak: number;            // Hz — peak F0 in utterance
+  f0Range: number;           // Hz — max minus min (narrowing = load)
+  f0Std: number;             // Hz — standard deviation
+  vocalIntensityRMS: number; // dB relative to baseline
+  speechRateWPM: number;     // Words per minute (from Deepgram word timestamps)
+  articulationRateWPM: number; // WPM excluding pauses > 200ms
+  disfluencyCount: number;   // "um", "uh", "er", "ah" count
+  disfluencyRate: number;    // Per 100 words
+  utteranceDurationMs: number;
+}
+
+interface CognitiveLoadBaseline {
+  pilotId: string;
+  sampleCount: number;       // Utterances in baseline
+  f0Mean: number; f0Std: number; f0RangeMean: number;
+  intensityMean: number; intensityStd: number;
+  speechRateMean: number; speechRateStd: number;
+  disfluencyRateMean: number; disfluencyRateStd: number;
+  isCalibrated: boolean;     // True after 10+ utterances
+}
+
+interface CognitiveLoadScore {
+  eventIndex: number;
+  biomarkers: VoiceBiomarkers;
+  deviations: {              // Z-scores relative to pilot's own baseline
+    f0Deviation: number;     // Positive = higher pitch = more load
+    intensityDeviation: number;
+    speechRateDeviation: number; // Negative = slower = more load
+    f0RangeDeviation: number;    // Negative = narrower = more load
+    disfluencyDeviation: number; // Positive = more disfluencies = more load
+  };
+  compositeLoad: number;     // 0-100 weighted composite
+  confidence: number;        // 0-1 based on calibration status + signal quality
+  calibrationStatus: 'uncalibrated' | 'partial' | 'calibrated';
+}
+```
+
+**Composite load weights:** F0 deviation 0.35, disfluency rate 0.25, F0 range narrowing 0.15, speech rate decrease 0.15, vocal intensity 0.10. Derived from relative evidence strength — see `Metrics_research.md` Section 1.6.
+
+**Calibration:** First 5 utterances → partial (confidence 0.3-0.65). First 10 → calibrated (confidence 0.7-1.0). No special UI. Stored per-pilot in Supabase PostgreSQL.
 
 ### CBTA Competency Mapping
 
@@ -617,14 +756,14 @@ Each drill maps to 2-3 CBTA competencies. Individual event scores roll up into c
 
 | Competency | Code | Measured By |
 |-----------|------|-------------|
-| Communication | COM | Readback accuracy, phraseology, callsign usage, response latency |
-| Workload Management | WLM | Task completion time, sequential task ordering, multitask performance |
-| Situational Awareness | SAW | Decision correctness when given conflicting information, PilotPredict trap detection |
+| Communication | COM | Confidence-adjusted readback accuracy, phraseology, callsign usage, response latency |
+| Workload Management | WLM | Task completion time, cognitive load composite (inverted), sequential task ordering |
+| Situational Awareness | SAW | Decision correctness with conflicting information, PilotPredict trap detection, cognitive load context |
 | Knowledge | KNO | Procedural correctness, PilotPredict trap detection, holding pattern entry |
-| Problem Solving & Decision Making | PSD | Decision correctness, time-to-decision, option quality |
+| Problem Solving & Decision Making | PSD | Decision correctness, time-to-decision, clarification requests |
 | Flight Path Management | FPM | Flight plan modifications, altitude/heading selections, mode selections |
 
-**Aggregation:** Weighted rolling average across drill attempts, stored in localStorage. Radar chart displays all six competencies on a 0-100 scale.
+**Aggregation:** Weighted rolling average (exponential decay, 0.95^(N-i)) across last 20 drill attempts. Stored server-side in Supabase PostgreSQL. Radar chart (shadcn/ui Charts) displays all six competencies with optional population P25/P75 overlay.
 
 ### Decision Scoring
 
@@ -709,46 +848,138 @@ Derived from Anthem cockpit visual design — dark background with cyan, green, 
 
 ---
 
-## API Proxy Server
+## Supabase Backend
 
-### Express Server Design
+### Overview
 
-Minimal Express server running on port 3001 alongside Vite dev server on 5173. Started together via `concurrently` in `pnpm dev`.
+Supabase replaces the Express + SQLite stack entirely. There is no `app/server/` directory. The browser talks directly to Supabase Cloud (for data CRUD and analytics) and LiveKit Cloud (for real-time audio). Secret-dependent operations use Supabase Edge Functions.
 
-```typescript
-// server/index.ts
-import express from 'express';
-import cors from 'cors';
-import { atcRouter } from './routes/atc';
-import { ttsRouter } from './routes/tts';
-import { sttRouter } from './routes/stt';
+### Edge Functions
 
-const app = express();
-app.use(cors({ origin: 'http://localhost:5173' }));
-app.use(express.json());
+Edge Functions run on Deno and access secrets via `Deno.env.get()`. The browser calls them via `supabase.functions.invoke()`.
 
-app.use('/api/atc', atcRouter);
-app.use('/api/tts', ttsRouter);
-app.use('/api/stt', sttRouter);
+**`supabase/functions/atc/index.ts`** — Claude API proxy. Receives scenario context from the browser, calls the Anthropic API with the `ANTHROPIC_API_KEY`, returns ATC instruction + expected readback.
 
-app.listen(3001, () => console.log('API proxy running on :3001'));
+**`supabase/functions/livekit-token/index.ts`** — LiveKit room token generation. Uses `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` to mint a short-lived access token for the browser to join a LiveKit room.
+
+### Environment Variables
+
+```env
+# app/.env.example
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...                      # Public anon key (safe for browser)
+VITE_LIVEKIT_URL=wss://your-project.livekit.cloud
+
+# Supabase Edge Function secrets (set via supabase secrets set)
+ANTHROPIC_API_KEY=sk-ant-...
+LIVEKIT_API_KEY=...
+LIVEKIT_API_SECRET=...
+ELEVENLABS_API_KEY=...
+DEEPGRAM_API_KEY=...
 ```
-
-### Routes
-
-**POST /api/atc** — Proxies to Claude API. Accepts scenario context, returns ATC instruction + expected readback.
-
-**POST /api/tts** — Proxies to ElevenLabs. Accepts text, returns audio stream (audio/mpeg).
-
-**GET /api/stt/token** — Calls Deepgram's API to provision a short-lived temporary authentication token. Returns the token to the browser, which then opens a direct WebSocket to Deepgram. The token is scoped and expires quickly, so even if intercepted, exposure is minimal.
 
 ### Security
 
-- All API keys stored in `.env` file (server-side only, never bundled by Vite)
-- `.env` is in `.gitignore`
-- `.env.example` documents required keys without values
-- Deepgram uses temporary token pattern — the actual API key never reaches the browser
-- CORS restricted to localhost in development
+- All API keys stored as Supabase Edge Function secrets — never exposed in browser code
+- `.env` contains only public Supabase URL/anon key and LiveKit URL (safe for browser)
+- Edge Functions access secrets via `Deno.env.get()` at runtime
+- LiveKit tokens are short-lived and scoped to a specific room
+- Supabase anon key is safe for browser — Row Level Security (RLS) controls data access
+
+---
+
+## Supabase PostgreSQL — Population-Level Storage
+
+### Why Not localStorage
+
+Final Synthesis Layer 3 requires "population-level training data identifying systematic competency gaps across pilot fleet." ICAO Doc 9995 mandates "flight data analysis to tailor training programs." Neither is achievable with browser-local storage.
+
+### Schema
+
+PostgreSQL via Supabase, managed through migrations (`supabase/migrations/001_initial_schema.sql`).
+
+**Core tables:**
+
+- `pilots` — id, name, accent_group, experience_level, previous_avionics (JSONB), timestamps
+- `sessions` — id, pilot_id (FK), started_at, ended_at, drill_count
+- `drill_results` — id, session_id (FK), pilot_id (FK), drill_id, scores, metrics_json, cbta_scores_json, cognitive_load_json, transcript_confidence, estimated_wer
+- `readback_scores` — id, drill_result_id (FK), pilot_id, event_index, raw_accuracy, confidence_adjusted_accuracy, latency_raw_ms, latency_adjusted_ms, scoring_basis, confidence_words_json
+- `cognitive_load_baselines` — id, pilot_id (FK, unique), calibration stats (f0, intensity, speech rate, disfluency)
+
+Indexed on pilot_id and drill_id for analytics queries.
+
+### Migration Map — Express to Supabase
+
+| Old (Express) | New (Supabase) |
+|----------------|----------------|
+| `GET/POST /api/pilots` | `supabase.from('pilots').select() / .insert()` |
+| `PUT /api/pilots/:id` | `supabase.from('pilots').update()` |
+| `GET /api/pilots/:id/baseline` | `supabase.from('cognitive_load_baselines').select()` |
+| `POST /api/sessions` | `supabase.from('sessions').insert()` |
+| `POST /api/sessions/:id/drills` | `supabase.from('drill_results').insert()` |
+| `GET /api/analytics/population` | `supabase.rpc('population_cbta_baseline', {...})` |
+| `GET /api/analytics/pilot/:id/percentiles` | `supabase.rpc('pilot_percentile_rank', {...})` |
+| `GET /api/export/pilot/:id` | `supabase.from('drill_results').select()` + client formatting |
+
+### Analytics via PostgreSQL RPC Functions
+
+Analytics use PostgreSQL RPC functions for server-side aggregation:
+
+```sql
+CREATE OR REPLACE FUNCTION population_cbta_baseline(
+  accent_group_filter TEXT,
+  experience_level_filter TEXT
+) RETURNS TABLE (competency TEXT, p25 FLOAT, p50 FLOAT, p75 FLOAT) AS $$
+  SELECT competency,
+    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY score::float),
+    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY score::float),
+    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY score::float)
+  FROM (
+    SELECT (jsonb_each_text(cbta_scores_json)).key AS competency,
+           (jsonb_each_text(cbta_scores_json)).value AS score
+    FROM drill_results
+    JOIN pilots ON drill_results.pilot_id = pilots.id
+    WHERE pilots.accent_group = accent_group_filter
+      AND pilots.experience_level = experience_level_filter
+  ) t
+  GROUP BY competency;
+$$ LANGUAGE sql;
+```
+
+### Data Flow
+
+```
+assessment-store → api-client.ts → supabase.from(...) → Supabase PostgreSQL
+```
+
+**Offline fallback:** `storage.ts` retains localStorage. If Supabase is unreachable, data queues locally and syncs when connection becomes available.
+
+### Pilot Profiles
+
+```typescript
+interface PilotProfile {
+  id: string;                // UUID
+  name: string;
+  accentGroup: AccentGroup;  // For WER stratification (Report B recommendation)
+  experienceLevel: ExperienceLevel;
+  previousAvionics: string[];
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+type AccentGroup =
+  | 'native-english-us' | 'native-english-uk' | 'native-english-au'
+  | 'european' | 'south-asian' | 'east-asian' | 'southeast-asian'
+  | 'middle-eastern' | 'latin-american' | 'african' | 'other';
+
+type ExperienceLevel = 'student' | 'low-time' | 'mid-time' | 'high-time' | 'atp';
+```
+
+Selection via `PilotSelector.tsx` in TopNavBar. No auth — trust-based identity (prototype constraint).
+
+### Population Analytics
+
+`CBTARadar.tsx` (shadcn/ui Charts radar) accepts optional `populationBaseline` prop → renders P25/P75 band behind the pilot's individual scores. `CohortCompare.tsx` enables accent group comparison, experience level comparison, and per-drill difficulty analysis.
 
 ---
 
@@ -757,49 +988,31 @@ app.listen(3001, () => console.log('API proxy running on :3001'));
 ### ATC Drill Cycle
 
 ```
-┌─────────────┐
-│ DrillStart  │
-└──────┬──────┘
-       ▼
-┌──────────────┐     ┌──────────────┐     ┌───────────────┐
-│ ScenarioRunner│────▶│  atc-engine  │────▶│  Claude API   │
-│ reads next   │     │  builds ctx  │     │  (via proxy)  │
-│ event        │     └──────┬───────┘     └───────┬───────┘
-└──────────────┘            │                     │
-                            ▼                     ▼
-                   ┌────────────────┐    ATC instruction +
-                   │ voice-synthesis│    expected readback
-                   │ (ElevenLabs)  │
-                   └───────┬────────┘
-                           ▼
-                   Audio plays through speakers
-                   atcSpeakEnd timestamp recorded
-                           │
-                           ▼
-                   ┌────────────────┐
-                   │  Pilot hears,  │
-                   │  presses PTT   │
-                   └───────┬────────┘
-                           ▼
-                   ┌────────────────┐     ┌──────────────┐
-                   │ voice-recog    │────▶│   Deepgram   │
-                   │ (WebSocket)    │◀────│   Nova-2     │
-                   └───────┬────────┘     └──────────────┘
-                           │
-                    interim transcripts
-                    + final with timestamps
-                           │
-                           ▼
-                   ┌────────────────┐
-                   │  assessment    │
-                   │  engine scores │
-                   │  readback      │
-                   └───────┬────────┘
-                           ▼
-                   ┌────────────────┐
-                   │ Next event or  │
-                   │ drill complete │
-                   └────────────────┘
+1. Browser → LiveKit JS SDK: connect to room, publish mic track
+2. ScenarioRunner triggers ATC event → calls Supabase Edge Function /atc → Claude returns instruction
+3. Instruction text → sent to agent via data channel
+4. Agent Worker:
+   a. Receives instruction text
+   b. Sends to ElevenLabs TTS → audio frames played into room
+   c. Browser hears ATC instruction via LiveKit audio track
+
+5. Pilot presses PTT → browser sends PTT_START via data channel
+6. Agent Worker:
+   a. Captures raw audio frames from pilot's track
+   b. Streams audio to Deepgram → real-time transcripts (per-word confidence + timestamps)
+   c. Interim transcripts sent to browser via data channel → live TranscriptDisplay
+   d. Runs F0, RMS, MFCC, spectral extraction (librosa) on audio frames
+
+7. Pilot releases PTT → browser sends PTT_END via data channel
+8. Agent Worker:
+   a. Deepgram final transcript with per-word confidence + timestamps
+   b. Computes: readback accuracy (confidence-weighted), speech rate, disfluency rate
+   c. Computes: cognitive load score (F0 deviation + RMS + spectral vs baseline)
+   d. Computes: latency decomposition
+   e. Sends assessment payload to browser via data channel
+   f. Persists to Supabase via REST API (service role key)
+
+9. Browser receives assessment → updates Zustand stores → renders shadcn/ui Charts
 ```
 
 ### PilotPredict Flow
@@ -823,7 +1036,15 @@ PilotPredict component shows suggestion chip
 
 ```
 Event scores (per-event)
-  ├── ReadbackScore (accuracy, latency, phraseology)
+  ├── ReadbackScore
+  │     ├── Confidence-weighted accuracy (raw + adjusted)
+  │     ├── Latency decomposition (agent-side)
+  │     ├── Phraseology, callsign, estimated WER
+  │     └── Scoring basis: confident | uncertain | abstained
+  ├── CognitiveLoadScore
+  │     ├── F0 deviation, disfluency rate, speech rate, intensity (z-scores)
+  │     ├── Composite load (0-100, weighted)
+  │     └── Calibration status + confidence
   ├── DecisionScore (correct, time, timed_out)
   ├── TrapScore (detected, time_to_reject)
   └── TouchScore (correct, task_time, errors)
@@ -832,21 +1053,24 @@ Event scores (per-event)
 DrillMetrics (per-drill aggregate)
   ├── Overall score (0-100)
   ├── Per-event breakdown
-  └── Per-competency scores
+  ├── Per-competency scores
+  └── Cognitive load timeline
        │
        ▼
-CBTAScores (rolling session aggregate)
-  ├── COM: 0-100
-  ├── WLM: 0-100
-  ├── SAW: 0-100
-  ├── KNO: 0-100
-  ├── PSD: 0-100
-  └── FPM: 0-100
+CBTAScores (rolling session aggregate, exponential decay)
+  ├── COM: 0-100  (readback accuracy + phraseology + latency)
+  ├── WLM: 0-100  (task time + cognitive load inverted)
+  ├── SAW: 0-100  (decision correctness + trap detection)
+  ├── KNO: 0-100  (procedural correctness + trap detection)
+  ├── PSD: 0-100  (decision correctness + time-to-decision)
+  └── FPM: 0-100  (flight plan mods + mode selections)
        │
        ▼
-localStorage persistence
-  ├── Session history (last 50 drill results)
-  └── CBTA running averages
+Server-side persistence (Supabase PostgreSQL via api-client)
+  ├── Drill results with full metrics
+  ├── Per-pilot CBTA running averages
+  ├── Cognitive load baselines (per-pilot)
+  └── Population analytics (aggregated)
 ```
 
 ---
@@ -887,9 +1111,13 @@ App
 │
 └── [tab: assessment]
     └── AssessmentDashboard
-        ├── CompetencyRadar
-        ├── DrillMetricsCard (×N, recent drills)
-        └── SessionSummary
+        ├── CBTARadar (shadcn/ui radar chart + population P25/P75 overlay)
+        ├── CognitiveLoadIndicator (timeline + sparklines)
+        ├── DrillHistory (bar/line chart with confidence + latency decomposition)
+        ├── TrendChart (competency over time)
+        ├── CohortCompare (accent group, experience level drill-down)
+        ├── SessionSummary (KPI cards)
+        └── ExportButton (JSON/CSV)
 ```
 
 ---
@@ -898,10 +1126,17 @@ App
 
 ```bash
 # Install dependencies
-pnpm install
+pnpm install                  # Frontend
+pip install -r agent/requirements.txt  # Agent
 
-# Development (starts both Vite and Express proxy via concurrently)
-pnpm dev
+# Development (3 processes)
+supabase start                # Local Supabase (Postgres + Edge Functions)
+pnpm dev                      # Starts: Vite (:5173) + LiveKit Agent Worker
+
+# Or separately:
+pnpm dev:frontend             # Vite dev server
+pnpm dev:agent                # LiveKit agent worker (Python)
+supabase functions serve      # Edge Functions (local)
 
 # Production build
 pnpm build
@@ -913,25 +1148,7 @@ pnpm test
 pnpm lint
 ```
 
-### Vite Configuration
-
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': 'http://localhost:3001',
-    },
-  },
-});
-```
-
-The Vite dev server proxies `/api` requests to the Express server, so the browser only talks to one origin (localhost:5173) and API calls transparently route to Express on 3001.
+The browser talks directly to Supabase Cloud and LiveKit Cloud — there is no local API proxy to configure. Vite serves the frontend and the LiveKit agent worker runs as a separate Python process.
 
 ---
 
@@ -939,12 +1156,18 @@ The Vite dev server proxies `/api` requests to the Express server, so the browse
 
 | Decision | Chosen | Alternative | Rationale |
 |----------|--------|-------------|-----------|
-| STT provider | Deepgram Nova-2 | Web Speech API | Word timestamps for latency, keyword boosting for aviation terms, cross-browser |
-| TTS provider | ElevenLabs + fallback | Web Speech API only | Realistic ATC voice; fallback keeps prototype functional without API key |
-| ATC generation | Claude API (live) | Pre-scripted responses | Natural variation per drill run; drill definitions constrain scope |
+| STT provider | Deepgram Nova-2 (sole, via LiveKit plugin) | Whisper-ATC + Deepgram dual | Dual STT requires self-hosted GPU; Deepgram provides streaming, per-word confidence, keyword boosting — sufficient for prototype |
+| Audio infrastructure | LiveKit Cloud (WebRTC) | DIY WebSocket + MediaRecorder | WebRTC transport, STUN/TURN, raw audio frame access in Python agent, PTT via data channel |
+| Agent runtime | LiveKit Agents (Python) | Browser-side AudioWorklet | Production-grade F0 via librosa, unified STT/TTS/analysis pipeline, numpy post-processing |
+| TTS provider | ElevenLabs (via LiveKit TTS plugin) | Web SpeechSynthesis only | Realistic ATC voice; fallback keeps prototype functional without API key |
+| ATC generation | Claude API (via Supabase Edge Function) | Pre-scripted responses | Natural variation per drill run; Edge Function keeps API key server-side |
 | State management | Zustand | Redux / React Context | Surgical re-renders needed; minimal boilerplate; no provider nesting |
-| Persistence | localStorage | SQLite / Postgres | Prototype-grade; data shapes can lift to DB without refactor |
-| API key handling | Server-side proxy | Browser env vars | Security; Deepgram temp token pattern minimizes exposure |
-| Readback scoring | Fuzzy LCS match | Exact string match | STT imperfect even with Deepgram; must tolerate transcription variance |
+| Backend | Supabase (Postgres + Edge Functions) | Express + SQLite | Managed DB, auto REST API, Edge Functions for secrets, zero server ops |
+| Charts | shadcn/ui Charts (Recharts) | Tremor / raw Recharts | Radar chart support (Tremor lacks it), CSS variable theming, copy-paste ownership |
+| Voice analysis | librosa + numpy (Python agent) | Meyda.js (browser) / AudioWorklet | Meyda.js lacks F0; librosa is research-grade for all biomarkers; zero extra infra since Python agent already exists |
+| API key handling | Supabase Edge Functions + LiveKit server-side | Browser env vars | Secrets never in browser; Edge Functions for Claude/LiveKit tokens |
+| Readback scoring | Confidence-weighted LCS | Raw LCS / exact match | Per-word confidence prevents STT errors from penalizing pilots; abstains when uncertain |
+| Latency measurement | Agent-side speech onset detection | Browser AudioWorklet VAD | Agent already processes raw audio; consistent measurement in one location |
+| Cognitive load baseline | Per-speaker calibration | Population norms | NASA Ames found zero cross-individual correlation; per-speaker is the only valid approach |
 | Drill definitions | Declarative data objects | Imperative code | Easier to author new drills; separates content from execution logic |
 | CSS approach | Tailwind + CSS variables | CSS-in-JS / styled-components | Fast iteration; theme variables enable consistent Anthem aesthetic |
