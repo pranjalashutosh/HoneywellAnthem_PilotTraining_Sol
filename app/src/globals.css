@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  /* Background layers */
+  --color-anthem-bg-primary: #0a0e17;
+  --color-anthem-bg-secondary: #111827;
+  --color-anthem-bg-tertiary: #1a2235;
+  --color-anthem-bg-input: #0d1321;
+
+  /* Primary accent — Cyan (active elements, selected state) */
+  --color-anthem-cyan: #00d4ff;
+  --color-anthem-cyan-dim: #0891b2;
+
+  /* Secondary accent — Green (positive/confirmed state) */
+  --color-anthem-green: #22c55e;
+  --color-anthem-green-dim: #16a34a;
+
+  /* Tertiary accent — Magenta (warnings, attention) */
+  --color-anthem-magenta: #e040fb;
+  --color-anthem-magenta-dim: #ab47bc;
+
+  /* Alert — Amber (cautions) */
+  --color-anthem-amber: #f59e0b;
+
+  /* Alert — Red (warnings) */
+  --color-anthem-red: #ef4444;
+
+  /* Text hierarchy */
+  --color-anthem-text-primary: #e2e8f0;
+  --color-anthem-text-secondary: #94a3b8;
+  --color-anthem-text-muted: #475569;
+
+  /* Borders */
+  --color-anthem-border: #1e293b;
+  --color-anthem-border-active: #00d4ff;
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/* shadcn/ui chart color variables */
+:root {
+  --chart-1: #00d4ff;
+  --chart-2: #22c55e;
+  --chart-3: #e040fb;
+  --chart-4: #f59e0b;
+  --chart-5: #0891b2;
+
+  /* Touch target minimum */
+  --anthem-touch-min: 44px;
+
+  /* Anthem cyan glow for active elements */
+  --anthem-cyan-glow: rgba(0, 212, 255, 0.15);
+}
+
+/* Dark body — no light mode */
+body {
+  background-color: var(--color-anthem-bg-primary);
+  color: var(--color-anthem-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-anthem-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-anthem-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-anthem-text-muted);
+}
