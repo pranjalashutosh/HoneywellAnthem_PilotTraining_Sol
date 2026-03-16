@@ -33,16 +33,16 @@
 **Goal**: Every TypeScript interface exists. All 6 Zustand stores operational in-memory.
 
 ### Types
-- [ ] **T1.1** Create `app/src/types/cockpit.ts` — CockpitState, CockpitMode, Waypoint, Frequency, CockpitAction, AnthemTelemetryEvent, DisplayEvent, PilotPredictEvent, FlightParameterEvent
-- [ ] **T1.2** Create `app/src/types/scenario.ts` — DrillDefinition, DrillEvent (union: ATCInstructionEvent | DecisionPointEvent | PredictSuggestionEvent | CockpitActionEvent), DrillPhase, EventResult, DecisionOption
-- [ ] **T1.3** Create `app/src/types/assessment.ts` — ReadbackScore, DecisionScore, TrapScore, TouchScore, DrillMetrics, DrillResult, CBTAScores, CBTACompetency, UncertainElement
-- [ ] **T1.4** Create `app/src/types/voice.ts` — TranscriptEntry, ConfidenceAnnotatedWord, VoiceBiomarkers
-- [ ] **T1.5** Create `app/src/types/cognitive-load.ts` — CognitiveLoadBaseline, CognitiveLoadScore
-- [ ] **T1.6** Create `app/src/types/latency.ts` — LatencyDecomposition (pilotReactionMs, speechOnsetMs, totalMs)
-- [ ] **T1.7** Create `app/src/types/pilot.ts` — PilotProfile, AccentGroup, ExperienceLevel
-- [ ] **T1.8** Create `app/src/types/atc.ts` — ATCContext, ATCInstruction, ATCConversationEntry
-- [ ] **T1.9** Create `app/src/types/analytics.ts` — PopulationBaseline, CohortComparison, PercentileRank
-- [ ] **T1.10** Create `app/src/types/index.ts` — Barrel file re-exporting all types
+- [x] **T1.1** Create `app/src/types/cockpit.ts` — CockpitState, CockpitMode, Waypoint, Frequency, CockpitAction, AnthemTelemetryEvent, DisplayEvent, PilotPredictEvent, FlightParameterEvent
+- [x] **T1.2** Create `app/src/types/scenario.ts` — DrillDefinition, DrillEvent (union: ATCInstructionEvent | DecisionPointEvent | PredictSuggestionEvent | CockpitActionEvent), DrillPhase, EventResult, DecisionOption
+- [x] **T1.3** Create `app/src/types/assessment.ts` — ReadbackScore, DecisionScore, TrapScore, TouchScore, DrillMetrics, DrillResult, CBTAScores, CBTACompetency, UncertainElement
+- [x] **T1.4** Create `app/src/types/voice.ts` — TranscriptEntry, ConfidenceAnnotatedWord, VoiceBiomarkers
+- [x] **T1.5** Create `app/src/types/cognitive-load.ts` — CognitiveLoadBaseline, CognitiveLoadScore
+- [x] **T1.6** Create `app/src/types/latency.ts` — LatencyDecomposition (pilotReactionMs, speechOnsetMs, totalMs)
+- [x] **T1.7** Create `app/src/types/pilot.ts` — PilotProfile, AccentGroup, ExperienceLevel
+- [x] **T1.8** Create `app/src/types/atc.ts` — ATCContext, ATCInstruction, ATCConversationEntry
+- [x] **T1.9** Create `app/src/types/analytics.ts` — PopulationBaseline, CohortComparison, PercentileRank
+- [x] **T1.10** Create `app/src/types/index.ts` — Barrel file re-exporting all types
 
 **Types Commit**: `feat(types): add complete TypeScript type system for all domain models`
 
@@ -317,7 +317,7 @@
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0: Scaffolding | 16 | 16 | Complete |
-| Phase 1: Types + Stores | 18 | 0 | Not Started |
+| Phase 1: Types + Stores | 18 | 10 | Types Complete |
 | Phase 2: Shared + Layout | 11 | 0 | Not Started |
 | Phase 3: Cockpit Panels | 21 | 0 | Not Started |
 | Phase 4: Supabase Backend | 17 | 0 | Not Started |
@@ -326,4 +326,4 @@
 | Phase 7: Assessment Engine | 12 | 0 | Not Started |
 | Phase 8: Dashboard | 14 | 0 | Not Started |
 | Phase 9: Integration | 15 | 0 | Not Started |
-| **Total** | **168** | **16** | **Phase 0 Complete** |
+| **Total** | **168** | **26** | **Phase 1 Types Complete** |
