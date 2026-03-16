@@ -202,28 +202,28 @@
 **Goal**: Browser ↔ LiveKit ↔ Python agent. PTT works. STT transcripts flow. ATC speaks with radio static.
 
 ### Python Agent
-- [ ] **T6.1** Create `agent/worker.py` — LiveKit agent entry point, room lifecycle, data channel message dispatch
-- [ ] **T6.2** Create `agent/stt.py` — Deepgram Nova-2 via LiveKit STT plugin, base keyword list + dynamic per-drill keywords, per-word confidence extraction, disfluency detection
-- [ ] **T6.3** Create `agent/tts.py` — ElevenLabs via LiveKit TTS plugin, radio static overlay, ATC_SPEAK_END data channel message
-- [ ] **T6.4** Create `agent/voice_analysis.py` — librosa F0 (pyin, 2048 window, 512 hop), RMS, MFCC (13 coeff), spectral (centroid, rolloff, flatness), numpy smoothing + octave correction
-- [ ] **T6.5** Create `agent/assessment.py` — Confidence-weighted readback scoring (tiers: ≥0.85 full, 0.60-0.84 half, <0.60 excluded), latency decomposition (pilotReactionMs + speechOnsetMs), cognitive load composite (F0 0.35, disfluency 0.25, F0 range 0.15, speech rate 0.15, intensity 0.10), baseline calibration (first 10 utterances)
-- [ ] **T6.6** Create `agent/prompts/atc_system.py` — ATC controller persona prompt with scenario awareness
+- [x] **T6.1** Create `agent/worker.py` — LiveKit agent entry point, room lifecycle, data channel message dispatch
+- [x] **T6.2** Create `agent/stt.py` — Deepgram Nova-2 via LiveKit STT plugin, base keyword list + dynamic per-drill keywords, per-word confidence extraction, disfluency detection
+- [x] **T6.3** Create `agent/tts.py` — ElevenLabs via LiveKit TTS plugin, radio static overlay, ATC_SPEAK_END data channel message
+- [x] **T6.4** Create `agent/voice_analysis.py` — librosa F0 (pyin, 2048 window, 512 hop), RMS, MFCC (13 coeff), spectral (centroid, rolloff, flatness), numpy smoothing + octave correction
+- [x] **T6.5** Create `agent/assessment.py` — Confidence-weighted readback scoring (tiers: ≥0.85 full, 0.60-0.84 half, <0.60 excluded), latency decomposition (pilotReactionMs + speechOnsetMs), cognitive load composite (F0 0.35, disfluency 0.25, F0 range 0.15, speech rate 0.15, intensity 0.10), baseline calibration (first 10 utterances)
+- [x] **T6.6** Create `agent/prompts/atc_system.py` — ATC controller persona prompt with scenario awareness
 
 **Agent Commit**: `feat(agent): implement LiveKit Python agent with STT, TTS, voice analysis, and assessment pipeline`
 
 ### Frontend LiveKit
-- [ ] **T6.7** Create `app/src/services/livekit-client.ts` — connectToRoom, publishMicTrack, subscribe to agent audio, data channel send/receive, disconnect
-- [ ] **T6.8** Create `app/src/hooks/useLiveKit.ts` — React hook, auto-connect on drill start, isConnected, connect, disconnect
-- [ ] **T6.9** Create `app/src/services/atc-engine.ts` — Call Edge Function /atc, send instruction to agent via data channel
-- [ ] **T6.10** Create `app/src/hooks/useATCEngine.ts` — React hook for ATC engine
+- [x] **T6.7** Create `app/src/services/livekit-client.ts` — connectToRoom, publishMicTrack, subscribe to agent audio, data channel send/receive, disconnect
+- [x] **T6.8** Create `app/src/hooks/useLiveKit.ts` — React hook, auto-connect on drill start, isConnected, connect, disconnect
+- [x] **T6.9** Create `app/src/services/atc-engine.ts` — Call Edge Function /atc, send instruction to agent via data channel
+- [x] **T6.10** Create `app/src/hooks/useATCEngine.ts` — React hook for ATC engine
 
 **LiveKit Client Commit**: `feat(livekit): add LiveKit client service, room hooks, and ATC engine integration`
 
 ### Voice Components
-- [ ] **T6.11** Create `app/src/components/voice/VoicePanel.tsx` — Right-side panel during drills
-- [ ] **T6.12** Create `app/src/components/voice/PTTButton.tsx` — Press-and-hold, audio level viz from LiveKit SDK, disabled while ATC speaks
-- [ ] **T6.13** Create `app/src/components/voice/TranscriptDisplay.tsx` — Live interim transcript, final with confidence-colored words (green/amber/dim)
-- [ ] **T6.14** Create `app/src/components/voice/VoiceStatus.tsx` — Connection, recording, ATC speaking indicators
+- [x] **T6.11** Create `app/src/components/voice/VoicePanel.tsx` — Right-side panel during drills
+- [x] **T6.12** Create `app/src/components/voice/PTTButton.tsx` — Press-and-hold, audio level viz from LiveKit SDK, disabled while ATC speaks
+- [x] **T6.13** Create `app/src/components/voice/TranscriptDisplay.tsx` — Live interim transcript, final with confidence-colored words (green/amber/dim)
+- [x] **T6.14** Create `app/src/components/voice/VoiceStatus.tsx` — Connection, recording, ATC speaking indicators
 - [ ] **T6.15** Verify `pnpm dev:agent` starts Python agent worker
 - [ ] **T6.16** Verify browser connects to LiveKit room (green dot in StatusBar)
 - [ ] **T6.17** Verify PTT activates microphone with visual feedback
@@ -322,8 +322,8 @@
 | Phase 3: Cockpit Panels | 21 | 21 | Complete |
 | Phase 4: Supabase Backend | 17 | 17 | Complete |
 | Phase 5: Drill System | 21 | 21 | Complete |
-| Phase 6: Voice Infra | 23 | 0 | Not Started |
+| Phase 6: Voice Infra | 23 | 14 | In Progress (verification remaining) |
 | Phase 7: Assessment Engine | 12 | 0 | Not Started |
 | Phase 8: Dashboard | 14 | 0 | Not Started |
 | Phase 9: Integration | 15 | 0 | Not Started |
-| **Total** | **168** | **104** | **Phase 5 Complete** |
+| **Total** | **168** | **118** | **Phase 6 In Progress** |
