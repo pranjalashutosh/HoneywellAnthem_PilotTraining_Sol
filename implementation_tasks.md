@@ -285,19 +285,19 @@
 
 ### Integration
 - [ ] **T9.1** End-to-end test: drill → voice → assessment → dashboard update
-- [ ] **T9.2** Baseline calibration UX: "Calibrating... (N/10 utterances)" progress → "Calibrated" green badge
-- [ ] **T9.3** Pre-populate Supabase seed data: 3-4 pilots, different experience levels + accent groups, 5-10 drill results each
-- [ ] **T9.4** Graceful degradation: no LiveKit → "Voice Unavailable" badge + keyboard drill mode
-- [ ] **T9.5** Graceful degradation: no Supabase → localStorage fallback + "Offline Mode" badge
-- [ ] **T9.6** Graceful degradation: no ElevenLabs → window.speechSynthesis + "Demo Voice" badge
+- [x] **T9.2** Baseline calibration UX: "Calibrating... (N/10 utterances)" progress → "Calibrated" green badge
+- [x] **T9.3** Pre-populate Supabase seed data: 3-4 pilots, different experience levels + accent groups, 5-10 drill results each
+- [x] **T9.4** Graceful degradation: no LiveKit → "Voice Unavailable" badge + keyboard drill mode
+- [x] **T9.5** Graceful degradation: no Supabase → localStorage fallback + "Offline Mode" badge
+- [x] **T9.6** Graceful degradation: no ElevenLabs → window.speechSynthesis + "Demo Voice" badge
 - [ ] **T9.7** Touch optimization: verify all interactions on tablet viewport (1024x768 minimum)
 
 **Integration Commit**: `feat(integration): end-to-end drill flow, calibration UX, and graceful degradation`
 
 ### Documentation (Strategic Dimensions 2, 3)
-- [ ] **T9.8** Create `docs/forge-mapping.md` — Supabase table → Honeywell Forge pipeline entity mapping
-- [ ] **T9.9** Create `docs/progression-story.md` — Epic → Epic 3.0 → Anthem training progression
-- [ ] **T9.10** Create `docs/demo-script.md` — Step-by-step demo guide (~8 min)
+- [x] **T9.8** Create `docs/forge-mapping.md` — Supabase table → Honeywell Forge pipeline entity mapping
+- [x] **T9.9** Create `docs/progression-story.md` — Epic → Epic 3.0 → Anthem training progression
+- [x] **T9.10** Create `docs/demo-script.md` — Step-by-step demo guide (~8 min)
 
 **Docs Commit**: `docs: add Forge mapping, Epic→Anthem progression story, and demo script`
 
@@ -325,5 +325,5 @@
 | Phase 6: Voice Infra | 23 | 14 | In Progress (verification remaining) |
 | Phase 7: Assessment Engine | 12 | 7 | In Progress (verification remaining) |
 | Phase 8: Dashboard | 14 | 9 | In Progress (verification remaining) |
-| Phase 9: Integration | 15 | 0 | Not Started |
-| **Total** | **168** | **134** | **Phase 8 In Progress** |
+| Phase 9: Integration | 15 | 8 | In Progress (verification remaining) |
+| **Total** | **168** | **142** | **Phase 9 In Progress** |
