@@ -64,21 +64,21 @@
 **Goal**: App looks like Anthem. Three-tab layout (Cockpit / Drills / Assessment) works.
 
 ### Shared Components
-- [ ] **T2.1** Create `app/src/components/shared/AnthemButton.tsx` — 44x44px min touch target, cyan border, glow on active, variants (primary/success/warning/danger)
-- [ ] **T2.2** Create `app/src/components/shared/AnthemCard.tsx` — Dark card with tertiary bg, subtle border, optional title
-- [ ] **T2.3** Create `app/src/components/shared/AnthemInput.tsx` — Dark input, monospace for data fields, sans-serif for labels
-- [ ] **T2.4** Create `app/src/components/shared/PilotSelector.tsx` — Dropdown in TopNavBar, create pilot inline, reads pilot-store
+- [x] **T2.1** Create `app/src/components/shared/AnthemButton.tsx` — 44x44px min touch target, cyan border, glow on active, variants (primary/success/warning/danger)
+- [x] **T2.2** Create `app/src/components/shared/AnthemCard.tsx` — Dark card with tertiary bg, subtle border, optional title
+- [x] **T2.3** Create `app/src/components/shared/AnthemInput.tsx` — Dark input, monospace for data fields, sans-serif for labels
+- [x] **T2.4** Create `app/src/components/shared/PilotSelector.tsx` — Dropdown in TopNavBar, create pilot inline, reads pilot-store
 
 **Shared Components Commit**: `feat(ui): add Anthem-themed shared components (Button, Card, Input, PilotSelector)`
 
 ### Layout
-- [ ] **T2.5** Create `app/src/components/layout/TopNavBar.tsx` — 3 tabs (Cockpit/Drills/Assessment), PilotSelector right side, cyan active underline
-- [ ] **T2.6** Create `app/src/components/layout/CockpitShell.tsx` — Two-panel layout (flight plan + radios), mode selection bar top, voice panel right
-- [ ] **T2.7** Create `app/src/components/layout/StatusBar.tsx` — UTC clock, active frequency (monospace), drill status indicator, LiveKit connection dot
-- [ ] **T2.8** Update `app/src/App.tsx` — Tab-based routing using ui-store.activeTab
-- [ ] **T2.9** Verify tabs switch correctly
-- [ ] **T2.10** Verify Anthem dark theme is consistent across all components
-- [ ] **T2.11** Verify all touch targets meet ≥44x44px minimum
+- [x] **T2.5** Create `app/src/components/layout/TopNavBar.tsx` — 3 tabs (Cockpit/Drills/Assessment), PilotSelector right side, cyan active underline
+- [x] **T2.6** Create `app/src/components/layout/CockpitShell.tsx` — Two-panel layout (flight plan + radios), mode selection bar top, voice panel right
+- [x] **T2.7** Create `app/src/components/layout/StatusBar.tsx` — UTC clock, active frequency (monospace), drill status indicator, LiveKit connection dot
+- [x] **T2.8** Update `app/src/App.tsx` — Tab-based routing using ui-store.activeTab
+- [x] **T2.9** Verify tabs switch correctly
+- [x] **T2.10** Verify Anthem dark theme is consistent across all components
+- [x] **T2.11** Verify all touch targets meet ≥44x44px minimum
 
 **Layout Commit**: `feat(layout): implement TopNavBar, CockpitShell, StatusBar with tab navigation`
 
@@ -318,7 +318,7 @@
 |-------|-------|----------|--------|
 | Phase 0: Scaffolding | 16 | 16 | Complete |
 | Phase 1: Types + Stores | 18 | 18 | Complete |
-| Phase 2: Shared + Layout | 11 | 0 | Not Started |
+| Phase 2: Shared + Layout | 11 | 11 | Complete |
 | Phase 3: Cockpit Panels | 21 | 0 | Not Started |
 | Phase 4: Supabase Backend | 17 | 0 | Not Started |
 | Phase 5: Drill System | 21 | 0 | Not Started |
@@ -326,4 +326,4 @@
 | Phase 7: Assessment Engine | 12 | 0 | Not Started |
 | Phase 8: Dashboard | 14 | 0 | Not Started |
 | Phase 9: Integration | 15 | 0 | Not Started |
-| **Total** | **168** | **34** | **Phase 1 Complete** |
+| **Total** | **168** | **45** | **Phase 2 Complete** |
