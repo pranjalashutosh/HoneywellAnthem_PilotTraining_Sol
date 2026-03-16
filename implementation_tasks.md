@@ -88,39 +88,39 @@
 **Goal**: Cockpit tab fully interactive — flight plans, frequencies, modes, PilotPredict, numpad.
 
 ### Panels
-- [ ] **T3.1** Create `app/src/components/panels/FlightPlanPanel.tsx` — Scrollable waypoint list
-- [ ] **T3.2** Create `app/src/components/panels/WaypointRow.tsx` — Single waypoint display, active highlighted in cyan
-- [ ] **T3.3** Create `app/src/components/panels/WaypointEditor.tsx` — Inline editor, opens TouchNumpad for altitude
-- [ ] **T3.4** Create `app/src/components/panels/RadiosPanel.tsx` — Active/standby frequencies (monospace), swap button
-- [ ] **T3.5** Create `app/src/components/panels/FrequencyTuner.tsx` — Step up/down, direct entry via numpad
+- [x] **T3.1** Create `app/src/components/panels/FlightPlanPanel.tsx` — Scrollable waypoint list
+- [x] **T3.2** Create `app/src/components/panels/WaypointRow.tsx` — Single waypoint display, active highlighted in cyan
+- [x] **T3.3** Create `app/src/components/panels/WaypointEditor.tsx` — Inline editor, opens TouchNumpad for altitude
+- [x] **T3.4** Create `app/src/components/panels/RadiosPanel.tsx` — Active/standby frequencies (monospace), swap button
+- [x] **T3.5** Create `app/src/components/panels/FrequencyTuner.tsx` — Step up/down, direct entry via numpad
 
 **Panels Commit**: `feat(cockpit): add FlightPlan and Radios panels with waypoint and frequency editing`
 
 ### Controls
-- [ ] **T3.6** Create `app/src/components/controls/ModeSelectionBar.tsx` — NAV/APR/HDG/ALT/VS buttons, active mode cyan glow
-- [ ] **T3.7** Create `app/src/components/controls/TouchNumpad.tsx` — Overlay numpad, 44x44px buttons, confirm/cancel
-- [ ] **T3.8** Create `app/src/components/controls/TouchKeyboard.tsx` — QWERTY layout for waypoint ID entry
-- [ ] **T3.9** Create `app/src/components/controls/PilotPredict.tsx` — AI suggestion chip area, accept/reject
-- [ ] **T3.10** Create `app/src/components/controls/PredictSuggestion.tsx` — Individual suggestion chip, magenta accent
+- [x] **T3.6** Create `app/src/components/controls/ModeSelectionBar.tsx` — NAV/APR/HDG/ALT/VS buttons, active mode cyan glow
+- [x] **T3.7** Create `app/src/components/controls/TouchNumpad.tsx` — Overlay numpad, 44x44px buttons, confirm/cancel
+- [x] **T3.8** Create `app/src/components/controls/TouchKeyboard.tsx` — QWERTY layout for waypoint ID entry
+- [x] **T3.9** Create `app/src/components/controls/PilotPredict.tsx` — AI suggestion chip area, accept/reject
+- [x] **T3.10** Create `app/src/components/controls/PredictSuggestion.tsx` — Individual suggestion chip, magenta accent
 
 **Controls Commit**: `feat(cockpit): add ModeSelectionBar, TouchNumpad, TouchKeyboard, PilotPredict controls`
 
 ### Static Data
-- [ ] **T3.11** Create `app/src/data/flight-plans/kjfk-kbos.ts` — JFK to Boston flight plan
-- [ ] **T3.12** Create `app/src/data/flight-plans/kteb-kpbi.ts` — Teterboro to Palm Beach flight plan
-- [ ] **T3.13** Create `app/src/data/frequencies.ts` — Common ATC frequencies for drills
-- [ ] **T3.14** Create `app/src/data/waypoints.ts` — Waypoint database for flight plans
-- [ ] **T3.15** Create `app/src/data/phraseology.ts` — Standard ICAO/FAA phraseology templates
+- [x] **T3.11** Create `app/src/data/flight-plans/kjfk-kbos.ts` — JFK to Boston flight plan
+- [x] **T3.12** Create `app/src/data/flight-plans/kteb-kpbi.ts` — Teterboro to Palm Beach flight plan
+- [x] **T3.13** Create `app/src/data/frequencies.ts` — Common ATC frequencies for drills
+- [x] **T3.14** Create `app/src/data/waypoints.ts` — Waypoint database for flight plans
+- [x] **T3.15** Create `app/src/data/phraseology.ts` — Standard ICAO/FAA phraseology templates
 
 **Static Data Commit**: `feat(data): add flight plans, frequencies, waypoints, and phraseology data`
 
 ### Mock Telemetry (Strategic Dimension 1)
-- [ ] **T3.16** Create `app/src/lib/telemetry-mock.ts` — Generate typed AnthemTelemetryEvent on every cockpit interaction (touch, mode change, frequency tune, PilotPredict accept/reject)
-- [ ] **T3.17** Verify flight plan renders with correct waypoints
-- [ ] **T3.18** Verify numpad enters altitude values correctly
-- [ ] **T3.19** Verify frequency tuner steps by 0.025 MHz
-- [ ] **T3.20** Verify PilotPredict chip shows and accepts/rejects
-- [ ] **T3.21** Verify console shows AnthemTelemetryEvent objects for all interactions
+- [x] **T3.16** Create `app/src/lib/telemetry-mock.ts` — Generate typed AnthemTelemetryEvent on every cockpit interaction (touch, mode change, frequency tune, PilotPredict accept/reject)
+- [x] **T3.17** Verify flight plan renders with correct waypoints
+- [x] **T3.18** Verify numpad enters altitude values correctly
+- [x] **T3.19** Verify frequency tuner steps by 0.025 MHz
+- [x] **T3.20** Verify PilotPredict chip shows and accepts/rejects
+- [x] **T3.21** Verify console shows AnthemTelemetryEvent objects for all interactions
 
 **Telemetry Commit**: `feat(telemetry): add Anthem avionics telemetry abstraction layer (Strategic Dimension 1)`
 
@@ -319,11 +319,11 @@
 | Phase 0: Scaffolding | 16 | 16 | Complete |
 | Phase 1: Types + Stores | 18 | 18 | Complete |
 | Phase 2: Shared + Layout | 11 | 11 | Complete |
-| Phase 3: Cockpit Panels | 21 | 0 | Not Started |
+| Phase 3: Cockpit Panels | 21 | 21 | Complete |
 | Phase 4: Supabase Backend | 17 | 0 | Not Started |
 | Phase 5: Drill System | 21 | 0 | Not Started |
 | Phase 6: Voice Infra | 23 | 0 | Not Started |
 | Phase 7: Assessment Engine | 12 | 0 | Not Started |
 | Phase 8: Dashboard | 14 | 0 | Not Started |
 | Phase 9: Integration | 15 | 0 | Not Started |
-| **Total** | **168** | **45** | **Phase 2 Complete** |
+| **Total** | **168** | **66** | **Phase 3 Complete** |
