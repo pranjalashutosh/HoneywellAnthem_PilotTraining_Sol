@@ -1,5 +1,229 @@
 # Honeywell Anthem Cockpit — Pilot Training Prototype
 
+---
+
+## Context Loading Protocol (MANDATORY)
+
+**Before writing ANY code**, Claude MUST read these files in order to build full context:
+
+1. **`ARCHITECTURE.md`** — Read FIRST. Contains system diagrams, data flows, store design, drill schema, CSS theme variables, assessment engine, component hierarchy, and all LiveKit/Supabase/Deepgram/ElevenLabs/Claude API integration details. This is the source of truth for HOW to build.
+2. **`implementation_plan.md`** — Read SECOND. Contains the 10-phase implementation strategy, strategic dimensions for Honeywell Leadership, critical path, and minimum viable demo definition. This is the source of truth for WHAT to build and WHY.
+3. **`implementation_tasks.md`** — Read THIRD. Contains the task checklist with `[ ]`/`[x]` progress tracking. Identify the current phase, find the next unchecked task, and begin work there. This is the source of truth for WHERE we are.
+
+**After reading all three**, Claude must:
+- Identify the current phase and next task(s) to implement
+- Confirm understanding of which files to create/modify
+- Reference ARCHITECTURE.md for exact type definitions, CSS variables, store interfaces, and component specs
+- Never guess or improvise when the architecture document specifies exact values
+
+---
+
+## Validation Loop (MANDATORY after every code change)
+
+After writing or modifying code, Claude MUST run this validation loop before marking any task complete:
+
+```
+┌─────────────────────────────────────┐
+│  1. TypeScript Compile Check        │
+│     cd app && npx tsc --noEmit      │
+│              ↓                      │
+│     ❌ Fix errors → restart loop    │
+│     ✅ Continue                     │
+├─────────────────────────────────────┤
+│  2. Lint Check                      │
+│     cd app && pnpm lint             │
+│              ↓                      │
+│     ❌ Fix errors → restart loop    │
+│     ✅ Continue                     │
+├─────────────────────────────────────┤
+│  3. Build Check                     │
+│     cd app && pnpm build            │
+│              ↓                      │
+│     ❌ Fix errors → restart loop    │
+│     ✅ Continue                     │
+├─────────────────────────────────────┤
+│  4. Test Check (if tests exist)     │
+│     cd app && pnpm test             │
+│              ↓                      │
+│     ❌ Fix errors → restart loop    │
+│     ✅ Continue                     │
+├─────────────────────────────────────┤
+│  5. Mark task(s) [x] in            │
+│     implementation_tasks.md         │
+│              ↓                      │
+│  6. Update Progress Summary table   │
+│     in implementation_tasks.md      │
+└─────────────────────────────────────┘
+```
+
+**Rules:**
+- The loop runs until ALL checks pass with zero errors
+- If a check fails, fix the issue and restart FROM STEP 1 (not just the failing step)
+- Never mark a task `[x]` until the full loop passes
+- Never skip lint or build — even for "small changes"
+- If lint/build tooling is not yet set up (Phase 0), run only `npx tsc --noEmit`
+- Log which validation steps passed in the commit message body if relevant
+
+---
+
+## MCP Tools — Development Workflow
+
+Two MCP servers are connected via `.mcp.json`. Claude MUST use these proactively during development instead of asking the user to run commands manually or writing files that require manual deployment.
+
+### Available Servers
+
+| Server | Purpose |
+|--------|---------|
+| **fetch** | Retrieve web pages, API docs, external references |
+| **supabase-mcp** | Manage Supabase: database schema, Edge Functions, types, logs |
+
+### Supabase MCP — When to Use
+
+**Database schema work:**
+- `apply_migration` — Create/alter tables. Prefer this over writing SQL files and telling the user to run them manually.
+- `list_tables` — Verify deployed schema matches ARCHITECTURE.md before and after changes.
+- `execute_sql` — Seed test data, run analytics queries, verify data integrity, test RPC functions.
+- `list_migrations` — Check what migrations exist before creating new ones to avoid conflicts.
+- `list_extensions` — Verify required PostgreSQL extensions (e.g., `uuid-ossp`, `pgcrypto`) are enabled.
+
+**Edge Functions:**
+- `deploy_edge_function` — Deploy functions (Claude API proxy, LiveKit token generation, etc.).
+- `get_edge_function` — Inspect currently deployed function code.
+- `list_edge_functions` — See what's deployed before creating or updating functions.
+
+**Type generation:**
+- `generate_typescript_types` — Run after every migration to keep `src/types/` in sync with the database schema.
+
+**Project credentials:**
+- `get_project_url` + `get_publishable_keys` — Retrieve `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for `.env` setup.
+
+**Monitoring & debugging:**
+- `get_logs` — Check Edge Function execution logs when debugging server-side issues.
+- `get_advisors` — Get database performance and security recommendations.
+
+**Branching (preview environments):**
+- `create_branch` / `merge_branch` — Test schema changes in isolation before applying to the main database.
+
+**Documentation lookup:**
+- `search_docs` — Search Supabase documentation for API usage, RLS policies, Edge Function patterns, etc.
+
+### Fetch MCP — When to Use
+
+- Looking up LiveKit, Deepgram, ElevenLabs, or Supabase documentation pages
+- Checking API references when implementing integrations
+- Fetching any external resource referenced in implementation tasks or ARCHITECTURE.md
+
+### MCP Workflow Rules
+
+- **Prefer MCP over manual CLI** — use Supabase MCP tools instead of asking the user to run `supabase` CLI commands
+- **Verify after mutations** — after `apply_migration`, confirm with `list_tables` or `execute_sql`
+- **Generate types after schema changes** — always run `generate_typescript_types` after applying a migration
+- **Check before creating** — use `list_tables` / `list_migrations` before writing new migrations to avoid conflicts
+- **Use `search_docs` before guessing** — when unsure about Supabase API usage, query the docs via MCP first
+
+---
+
+## Git Commit Protocol (MANDATORY)
+
+### Commit Message Format
+
+Use **Conventional Commits** with scope:
+
+```
+<type>(<scope>): <concise description>
+
+<optional body — what and why, not how>
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+### Types
+| Type | When to use |
+|------|------------|
+| `feat` | New feature or capability |
+| `fix` | Bug fix |
+| `refactor` | Code restructuring without behavior change |
+| `docs` | Documentation only |
+| `style` | Formatting, CSS, no logic change |
+| `test` | Adding or updating tests |
+| `chore` | Build config, tooling, dependency updates |
+| `perf` | Performance improvement |
+
+### Scopes (match project domains)
+| Scope | Covers |
+|-------|--------|
+| `scaffold` | Project setup, config, build tooling |
+| `types` | TypeScript type definitions |
+| `stores` | Zustand store implementations |
+| `ui` | Shared components, theme |
+| `layout` | TopNavBar, CockpitShell, StatusBar |
+| `cockpit` | Cockpit panels, controls |
+| `data` | Static data (flight plans, frequencies, drills) |
+| `telemetry` | Anthem telemetry abstraction |
+| `db` | Supabase schema, migrations, seed data |
+| `edge` | Supabase Edge Functions |
+| `api` | api-client, Supabase integration |
+| `drills` | Drill definitions |
+| `drill-ui` | Drill UI components |
+| `drill-engine` | Scenario runner, drill hooks |
+| `agent` | Python LiveKit agent |
+| `livekit` | LiveKit client, room hooks |
+| `voice` | Voice UI components |
+| `assessment` | Assessment engine, scoring |
+| `dashboard` | Assessment dashboard charts |
+| `integration` | End-to-end wiring, degradation |
+
+### Commit Frequency Rules
+- **Commit after each logical unit of work** — typically after completing a group of related tasks (see suggested commits in `implementation_tasks.md`)
+- **Never commit broken code** — the validation loop must pass before committing
+- **Never bundle unrelated changes** — one concern per commit
+- **Stage specific files** — use `git add <file>` not `git add .` or `git add -A`
+- **Include task IDs in commit body** when helpful: `Implements T0.1-T0.11`
+- **Keep subject line under 72 characters**
+
+### Commit Cadence by Phase
+Each phase in `implementation_tasks.md` has suggested commit points marked with **"Commit:"** lines. Follow these natural break points. If a phase is large, prefer multiple smaller commits over one large one.
+
+### Example Commits
+```
+feat(types): add complete TypeScript type system for all domain models
+
+Define interfaces for cockpit, scenario, assessment, voice, cognitive-load,
+latency, pilot, ATC, and analytics domains. All types compile under strict
+mode with zero errors.
+
+Implements T1.1-T1.10
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+```
+feat(cockpit): add FlightPlan and Radios panels with waypoint and frequency editing
+
+FlightPlanPanel renders scrollable waypoint list from cockpit-store.
+RadiosPanel shows active/standby frequencies with swap functionality.
+FrequencyTuner steps by 0.025 MHz with numpad direct entry.
+
+Implements T3.1-T3.5
+Validation: tsc ✓ | lint ✓ | build ✓
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+```
+fix(assessment): exclude low-confidence STT words from readback scoring
+
+Words with Deepgram confidence < 0.60 were incorrectly penalizing pilots.
+Now excluded per confidence tier rules (ARCHITECTURE.md assessment engine).
+
+Fixes T7.11
+Validation: tsc ✓ | lint ✓ | build ✓ | test ✓
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+---
+
 ## Project Overview
 
 A browser-based functional prototype that replicates Honeywell Anthem's touch-first cockpit interface combined with AI-driven ATC voice communication and decision-making drills. Demonstrates how AI-based assessment, voice-based cognitive load monitoring, and competency-based training concepts can accelerate pilot proficiency on the Anthem flight deck.
@@ -138,6 +362,49 @@ See `ARCHITECTURE.md` for the full technical architecture including system diagr
 - Display estimated WER alongside every readback score for transparency
 - Instructor authority is non-negotiable — AI assessment is decision-support, never autonomous grading
 - See `Metrics_research.md` for empirical backing of every metric and threshold
+
+## Known Issues & Resolutions
+
+### MCP Servers Failing — Two root causes (RESOLVED)
+
+> **Status:** Fixed. Both servers now show as connected in `/mcp`. Kept here as reference if the issue recurs.
+
+**Symptoms:** `fetch · ✗ failed` and `supabase-mcp · ✗ failed` in `/mcp`.
+
+#### Issue 1: `fetch` — `@anthropic-ai/mcp-server-fetch` does not exist on npm
+
+The correct official fetch server is Python-based, published as `mcp-server-fetch` on PyPI.
+Install `uv` (provides `uvx`) via Homebrew: `brew install uv`.
+Then configure `.mcp.json` to use `uvx mcp-server-fetch`.
+
+#### Issue 2: `supabase-mcp` — `mcp-remote` requires Node.js ≥ 20.18.1
+
+The system PATH defaults to Node v18 (nvm), but `mcp-remote@0.1.38` depends on `undici@7`
+which requires Node ≥ 20.18.1. Fix by injecting Node v20 into `PATH` via the `env` field.
+
+**Working `.mcp.json`:**
+
+```json
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "/opt/homebrew/bin/uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "supabase-mcp": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.supabase.com/mcp"],
+      "env": {
+        "PATH": "/Users/ashutoshpranjal/.nvm/versions/node/v20.20.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
+```
+
+`mcp-remote` handles the OAuth authentication flow on first connection (opens a browser window to authenticate with your Supabase account). Run `/doctor` after saving to confirm errors are resolved.
+
+---
 
 ## Approved Commands
 
