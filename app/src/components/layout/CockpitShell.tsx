@@ -1,7 +1,11 @@
-// T2.6 — Cockpit two-panel layout: flight plan + radios, mode bar top, voice panel right
+// T2.6 / T3 — Cockpit layout wired to real panels and controls
 
-import { AnthemCard } from '@/components/shared/AnthemCard';
 import { useUIStore } from '@/stores/ui-store';
+import { ModeSelectionBar } from '@/components/controls/ModeSelectionBar';
+import { TouchNumpad } from '@/components/controls/TouchNumpad';
+import { FlightPlanPanel } from '@/components/panels/FlightPlanPanel';
+import { RadiosPanel } from '@/components/panels/RadiosPanel';
+import { AnthemCard } from '@/components/shared/AnthemCard';
 
 export function CockpitShell() {
   const activePanel = useUIStore((s) => s.activePanel);
@@ -9,11 +13,7 @@ export function CockpitShell() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Mode selection bar placeholder — replaced in Phase 3 */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-anthem-border">
-        <span className="text-xs text-anthem-text-muted uppercase tracking-wider">Mode:</span>
-        <span className="text-xs font-mono text-anthem-cyan">NAV</span>
-      </div>
+      <ModeSelectionBar />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main cockpit area */}
@@ -46,19 +46,9 @@ export function CockpitShell() {
 
           {/* Panel content */}
           <div className="flex-1 overflow-auto p-4">
-            {activePanel === 'flight-plan' ? (
-              <AnthemCard title="Flight Plan">
-                <p className="text-anthem-text-muted text-sm">
-                  Flight plan panel — implemented in Phase 3
-                </p>
-              </AnthemCard>
-            ) : (
-              <AnthemCard title="Radios">
-                <p className="text-anthem-text-muted text-sm">
-                  Radios panel — implemented in Phase 3
-                </p>
-              </AnthemCard>
-            )}
+            <AnthemCard title={activePanel === 'flight-plan' ? 'Flight Plan' : 'Radios'}>
+              {activePanel === 'flight-plan' ? <FlightPlanPanel /> : <RadiosPanel />}
+            </AnthemCard>
           </div>
         </div>
 
@@ -74,6 +64,9 @@ export function CockpitShell() {
           </div>
         </div>
       </div>
+
+      {/* Numpad overlay */}
+      <TouchNumpad />
     </div>
   );
 }
