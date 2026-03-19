@@ -51,7 +51,9 @@ export function SessionSummary() {
       : 0;
 
   // Average latency
-  const allLatencies = allReadbacks.map((r) => r.latency.totalPilotLatencyMs);
+  const allLatencies = allReadbacks
+    .filter((r) => r.latency)
+    .map((r) => r.latency.totalPilotLatencyMs);
   const avgLatency =
     allLatencies.length > 0
       ? allLatencies.reduce((s, l) => s + l, 0) / allLatencies.length

@@ -42,8 +42,8 @@ export function CBTARadar({ scores, population }: CBTARadarProps) {
   });
 
   return (
-    <div className="w-full h-full min-h-[280px]">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full" style={{ height: 300 }}>
+      <ResponsiveContainer width="100%" height={300}>
         <RadarChart data={data} cx="50%" cy="50%" outerRadius="75%">
           <PolarGrid stroke="var(--color-anthem-border)" />
           <PolarAngleAxis

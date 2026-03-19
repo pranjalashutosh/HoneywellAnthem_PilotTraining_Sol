@@ -164,16 +164,31 @@ export async function fetchDrillHistory(pilotId: string): Promise<DrillResult[]>
 
   if (error) throw new Error(`fetchDrillHistory: ${error.message}`);
 
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    pilotId: row.pilot_id as string,
-    drillId: row.drill_id as string,
-    metrics: row.metrics_json as DrillMetrics,
-    cbta: row.cbta_scores_json as CBTAScores,
-    sessionId: row.session_id as string,
-    timestamp: new Date(row.completed_at as string).getTime(),
-    instructorOverride: (row.instructor_override_json as Record<string, unknown>) ?? null,
-  }));
+  return (data ?? []).map((row) => {
+    // Normalize metrics_json — seed data may lack cognitiveLoadScores, drillId, etc.
+    const rawMetrics = (row.metrics_json ?? {}) as Partial<DrillMetrics>;
+    const metrics: DrillMetrics = {
+      drillId: rawMetrics.drillId ?? (row.drill_id as string),
+      readbackScores: rawMetrics.readbackScores ?? [],
+      decisionScores: rawMetrics.decisionScores ?? [],
+      trapScores: rawMetrics.trapScores ?? [],
+      touchScores: rawMetrics.touchScores ?? [],
+      cognitiveLoadScores: rawMetrics.cognitiveLoadScores ?? [],
+      overallScore: rawMetrics.overallScore ?? (row.overall_score as number),
+      completedAt: rawMetrics.completedAt ?? new Date(row.completed_at as string).getTime(),
+    };
+
+    return {
+      id: row.id as string,
+      pilotId: row.pilot_id as string,
+      drillId: row.drill_id as string,
+      metrics,
+      cbta: row.cbta_scores_json as CBTAScores,
+      sessionId: row.session_id as string,
+      timestamp: new Date(row.completed_at as string).getTime(),
+      instructorOverride: (row.instructor_override_json as Record<string, unknown>) ?? null,
+    };
+  });
 }
 
 // ─── Readback Scores ───────────────────────────────────────

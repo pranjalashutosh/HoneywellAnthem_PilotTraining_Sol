@@ -1,16 +1,38 @@
 // T2.4 — Pilot selector dropdown with inline create
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePilotStore } from '@/stores/pilot-store';
+import { useAssessmentStore } from '@/stores/assessment-store';
+import { saveActivePilotId, loadActivePilotId } from '@/lib/storage';
 
 export function PilotSelector() {
   const pilots = usePilotStore((s) => s.pilots);
   const activePilot = usePilotStore((s) => s.activePilot);
   const selectPilot = usePilotStore((s) => s.selectPilot);
   const createPilot = usePilotStore((s) => s.createPilot);
+  const loadPilots = usePilotStore((s) => s.loadPilots);
+  const loadAssessment = useAssessmentStore((s) => s.loadFromServer);
 
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
+
+  // Load pilots on mount and restore active pilot selection
+  useEffect(() => {
+    void (async () => {
+      await loadPilots();
+      const savedId = loadActivePilotId();
+      if (savedId) {
+        const loaded = usePilotStore.getState().pilots;
+        const match = loaded.find((p) => p.id === savedId);
+        if (match) {
+          selectPilot(savedId);
+          void loadAssessment(savedId);
+        }
+      }
+    })();
+    // Run only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -22,6 +44,11 @@ export function PilotSelector() {
       anthemHours: 0,
       previousPlatform: 'Primus Epic',
     });
+    const newPilot = usePilotStore.getState().activePilot;
+    if (newPilot) {
+      saveActivePilotId(newPilot.id);
+      void loadAssessment(newPilot.id);
+    }
     setNewName('');
     setIsCreating(false);
   };
@@ -60,7 +87,11 @@ export function PilotSelector() {
         <>
           <select
             value={activePilot?.id ?? ''}
-            onChange={(e) => selectPilot(e.target.value)}
+            onChange={(e) => {
+              selectPilot(e.target.value);
+              saveActivePilotId(e.target.value);
+              void loadAssessment(e.target.value);
+            }}
             className="h-8 px-2 rounded border border-anthem-border bg-anthem-bg-input text-anthem-text-primary text-xs font-sans focus:outline-none focus:border-anthem-cyan cursor-pointer"
           >
             <option value="" disabled>

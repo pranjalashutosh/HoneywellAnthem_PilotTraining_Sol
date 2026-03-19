@@ -70,25 +70,35 @@ export function useATCEngine() {
       // Build ATC context from current state
       const context = buildContext(drill, prompt);
 
-      // Mark ATC as speaking
+      // Mark ATC as speaking with safety timeout
       setATCSpeaking(true);
+      const timeoutId = setTimeout(() => {
+        if (useVoiceStore.getState().isATCSpeaking) {
+          console.warn('[useATCEngine] ATC speaking timeout — resetting');
+          setATCSpeaking(false);
+        }
+      }, 30_000);
 
       // Generate and speak
       const instruction = await generateAndSpeakATCInstruction(context);
 
-      if (instruction) {
-        // Add ATC transcript entry
-        const atcEntry: TranscriptEntry = {
-          id: crypto.randomUUID(),
-          speaker: 'atc',
-          text: instruction.instruction,
-          words: [],
-          timestamp: Date.now(),
-          isFinal: true,
-          meanConfidence: 1.0,
-        };
-        commitTranscript(atcEntry);
+      if (!instruction) {
+        clearTimeout(timeoutId);
+        setATCSpeaking(false);
+        return null;
       }
+
+      // Add ATC transcript entry
+      const atcEntry: TranscriptEntry = {
+        id: crypto.randomUUID(),
+        speaker: 'atc',
+        text: instruction.instruction,
+        words: [],
+        timestamp: Date.now(),
+        isFinal: true,
+        meanConfidence: 1.0,
+      };
+      commitTranscript(atcEntry);
 
       return instruction;
     },

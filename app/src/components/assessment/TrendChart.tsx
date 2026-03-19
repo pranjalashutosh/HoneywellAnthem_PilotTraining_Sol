@@ -51,8 +51,8 @@ export function TrendChart() {
   const competencies: CBTACompetency[] = ['COM', 'WLM', 'SAW', 'KNO', 'PSD', 'FPM'];
 
   return (
-    <div className="w-full h-full min-h-[220px]">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full" style={{ height: 250 }}>
+      <ResponsiveContainer width="100%" height={250}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-anthem-border)" />
           <XAxis

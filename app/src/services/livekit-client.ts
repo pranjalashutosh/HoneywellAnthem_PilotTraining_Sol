@@ -155,3 +155,9 @@ export function sendATCInstruction(text: string, expectedReadback: string): void
     atcCallsign: '',
   });
 }
+
+export const MSG_SET_BASELINE = 'SET_BASELINE';
+
+export function sendBaseline(baseline: Record<string, unknown>): void {
+  void sendDataMessage(MSG_SET_BASELINE, { baselineData: baseline });
+}

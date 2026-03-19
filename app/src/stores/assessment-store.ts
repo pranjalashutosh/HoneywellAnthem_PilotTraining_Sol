@@ -22,6 +22,7 @@ interface AssessmentStore {
   cognitiveLoadBaseline: CognitiveLoadBaseline | null;
   currentEventCognitiveLoad: CognitiveLoadScore[];
   activePilotId: string | null;
+  activeSessionId: string | null;
 
   recordReadbackScore: (score: ReadbackScore) => void;
   recordCognitiveLoadScore: (score: CognitiveLoadScore) => void;
@@ -54,6 +55,7 @@ const defaultState = {
   cognitiveLoadBaseline: null as CognitiveLoadBaseline | null,
   currentEventCognitiveLoad: [] as CognitiveLoadScore[],
   activePilotId: null as string | null,
+  activeSessionId: null as string | null,
 };
 
 export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
@@ -197,13 +199,53 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     const state = get();
     if (!state.currentDrillMetrics || !state.activePilotId) return;
 
+    // Try to persist to server first to get a valid session ID
+    let sessionId = state.activeSessionId ?? '';
+
+    if (isOnline()) {
+      try {
+        // Create session if needed
+        if (!sessionId) {
+          sessionId = await api.createSession(state.activePilotId);
+          set({ activeSessionId: sessionId });
+        }
+
+        // Compute aggregate transcript confidence and WER from readback scores
+        const readbacks = state.currentDrillMetrics.readbackScores;
+        const transcriptConfidence = readbacks.length > 0
+          ? readbacks.reduce((s, r) => s + r.transcriptConfidence, 0) / readbacks.length
+          : null;
+        const estimatedWer = readbacks.length > 0
+          ? readbacks.reduce((s, r) => s + r.estimatedWER, 0) / readbacks.length
+          : null;
+
+        await api.saveDrillResult({
+          sessionId,
+          pilotId: state.activePilotId,
+          drillId: state.currentDrillMetrics.drillId,
+          overallScore: state.currentDrillMetrics.overallScore,
+          metrics: state.currentDrillMetrics,
+          cbta: state.cbta,
+          cognitiveLoad: state.currentDrillMetrics.cognitiveLoadScores,
+          transcriptConfidence,
+          estimatedWer,
+        });
+
+        if (state.cognitiveLoadBaseline) {
+          await api.saveCognitiveLoadBaseline(state.cognitiveLoadBaseline);
+        }
+      } catch (err) {
+        console.warn('[assessment-store] Supabase save failed:', err);
+      }
+    }
+
     const result: DrillResult = {
       id: crypto.randomUUID(),
       pilotId: state.activePilotId,
       drillId: state.currentDrillMetrics.drillId,
       metrics: state.currentDrillMetrics,
       cbta: state.cbta,
-      sessionId: '',
+      sessionId,
       timestamp: Date.now(),
       instructorOverride: null,
     };
@@ -218,17 +260,6 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     set((s) => ({
       sessionHistory: [...s.sessionHistory, result],
     }));
-
-    // Try to persist to server
-    if (isOnline()) {
-      try {
-        if (state.cognitiveLoadBaseline) {
-          await api.saveCognitiveLoadBaseline(state.cognitiveLoadBaseline);
-        }
-      } catch (err) {
-        console.warn('[assessment-store] Supabase save failed:', err);
-      }
-    }
   },
 
   reset: () => set(defaultState),

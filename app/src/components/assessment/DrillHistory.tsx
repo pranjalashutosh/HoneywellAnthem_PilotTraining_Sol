@@ -62,8 +62,8 @@ export function DrillHistory() {
   });
 
   return (
-    <div className="w-full h-full min-h-[220px]">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full" style={{ height: 250 }}>
+      <ResponsiveContainer width="100%" height={250}>
         <BarChart data={data} barGap={2}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-anthem-border)" />
           <XAxis

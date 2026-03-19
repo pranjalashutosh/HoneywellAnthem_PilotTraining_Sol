@@ -28,6 +28,7 @@ MSG_PTT_START = "PTT_START"
 MSG_PTT_END = "PTT_END"
 MSG_SET_KEYWORDS = "SET_KEYWORDS"
 MSG_ATC_INSTRUCTION = "ATC_INSTRUCTION"
+MSG_SET_BASELINE = "SET_BASELINE"
 
 # Data channel message types (agent → browser)
 MSG_INTERIM_TRANSCRIPT = "INTERIM_TRANSCRIPT"
@@ -55,6 +56,7 @@ class ATCAgentWorker:
         self._expected_readback: str = ""
         self._room: rtc.Room | None = None
         self._participant: rtc.RemoteParticipant | None = None
+        self._audio_stream: rtc.AudioStream | None = None
 
     async def start(self, ctx: agents.JobContext) -> None:
         """Called when the agent joins a room."""
@@ -92,6 +94,18 @@ class ATCAgentWorker:
         logger.info("Subscribed to audio track from %s", participant.identity)
         self._participant = participant
 
+        # Update pilot_id from participant identity if still unknown
+        if self._baseline.pilot_id == "unknown" and participant.identity:
+            self._baseline = CognitiveLoadBaseline(pilot_id=participant.identity)
+            logger.info("Set pilot_id from participant: %s", participant.identity)
+
+        # Start consuming audio frames in background
+        self._audio_stream = rtc.AudioStream(
+            track, sample_rate=16000, num_channels=1
+        )
+        import asyncio
+        asyncio.ensure_future(self._consume_audio_frames())
+
     def _on_data_received(
         self,
         data: bytes,
@@ -116,6 +130,8 @@ class ATCAgentWorker:
             self._handle_set_keywords(payload)
         elif msg_type == MSG_ATC_INSTRUCTION:
             self._handle_atc_instruction(payload)
+        elif msg_type == MSG_SET_BASELINE:
+            self._handle_set_baseline(payload)
         else:
             logger.warning("Unknown message type: %s", msg_type)
 
@@ -162,6 +178,48 @@ class ATCAgentWorker:
 
         asyncio.ensure_future(self._speak_atc(text))
 
+    def _handle_set_baseline(self, payload: dict) -> None:
+        """Restore a previously-saved cognitive load baseline from the browser."""
+        baseline_data = payload.get("baselineData", payload)
+        pilot_id = baseline_data.get("pilotId", self._baseline.pilot_id)
+        sample_count = baseline_data.get("sampleCount", 0)
+
+        if sample_count < 1:
+            logger.info("Ignoring empty baseline for %s", pilot_id)
+            return
+
+        self._baseline = CognitiveLoadBaseline(pilot_id=pilot_id)
+        self._baseline.sample_count = sample_count
+        self._baseline.f0_mean = baseline_data.get("f0Mean", 0.0)
+        self._baseline.f0_std = baseline_data.get("f0Std", 0.0)
+        self._baseline.f0_range_mean = baseline_data.get("f0RangeMean", 0.0)
+        self._baseline.intensity_mean = baseline_data.get("intensityMean", 0.0)
+        self._baseline.intensity_std = baseline_data.get("intensityStd", 0.0)
+        self._baseline.speech_rate_mean = baseline_data.get("speechRateMean", 0.0)
+        self._baseline.speech_rate_std = baseline_data.get("speechRateStd", 0.0)
+        self._baseline.disfluency_rate_mean = baseline_data.get("disfluencyRateMean", 0.0)
+        self._baseline.disfluency_rate_std = baseline_data.get("disfluencyRateStd", 0.0)
+        self._baseline.is_calibrated = baseline_data.get("isCalibrated", False)
+
+        # Restore running sums from means/stds so future updates are correct
+        n = self._baseline.sample_count
+        self._baseline._f0_sum = self._baseline.f0_mean * n
+        self._baseline._f0_sq_sum = (self._baseline.f0_std ** 2 + self._baseline.f0_mean ** 2) * n
+        self._baseline._f0_range_sum = self._baseline.f0_range_mean * n
+        self._baseline._intensity_sum = self._baseline.intensity_mean * n
+        self._baseline._intensity_sq_sum = (self._baseline.intensity_std ** 2 + self._baseline.intensity_mean ** 2) * n
+        self._baseline._sr_sum = self._baseline.speech_rate_mean * n
+        self._baseline._sr_sq_sum = (self._baseline.speech_rate_std ** 2 + self._baseline.speech_rate_mean ** 2) * n
+        self._baseline._disf_sum = self._baseline.disfluency_rate_mean * n
+        self._baseline._disf_sq_sum = (self._baseline.disfluency_rate_std ** 2 + self._baseline.disfluency_rate_mean ** 2) * n
+
+        logger.info(
+            "Baseline restored for %s: %d samples, calibrated=%s",
+            pilot_id,
+            sample_count,
+            self._baseline.is_calibrated,
+        )
+
     async def _speak_atc(self, text: str) -> None:
         """Synthesize and play ATC instruction with radio static."""
         if not self._room:
@@ -205,16 +263,19 @@ class ATCAgentWorker:
 
             # Unpublish the track after playback
             await self._room.local_participant.unpublish_track(track.sid)
-
-            # Record ATC speak end timestamp and notify browser
-            self._atc_speak_end_ts = time.time()
-            await self._send_message(
-                MSG_ATC_SPEAK_END, {"timestamp": self._atc_speak_end_ts}
-            )
             logger.info("ATC playback complete")
 
         except Exception:
             logger.exception("Error during ATC speech synthesis")
+        finally:
+            # Always send ATC_SPEAK_END so the browser unlocks PTT
+            self._atc_speak_end_ts = time.time()
+            try:
+                await self._send_message(
+                    MSG_ATC_SPEAK_END, {"timestamp": self._atc_speak_end_ts}
+                )
+            except Exception:
+                logger.warning("Failed to send ATC_SPEAK_END")
 
     async def _process_pilot_audio(self) -> None:
         """Process captured pilot audio: STT + voice analysis + assessment."""
@@ -438,13 +499,17 @@ class ATCAgentWorker:
             kind=rtc.DataPacketKind.KIND_RELIABLE,
         )
 
-    def on_audio_frame(self, frame: rtc.AudioFrame) -> None:
-        """Called for each incoming audio frame when PTT is active."""
-        if not self._ptt_active:
+    async def _consume_audio_frames(self) -> None:
+        """Consume audio frames from the AudioStream, buffering when PTT active."""
+        if not self._audio_stream:
             return
 
-        audio_data = np.frombuffer(frame.data, dtype=np.int16)
-        self._audio_buffer.append(audio_data)
+        logger.info("Audio frame consumer started")
+        async for event in self._audio_stream:
+            if not self._ptt_active:
+                continue
+            audio_data = np.frombuffer(event.frame.data, dtype=np.int16)
+            self._audio_buffer.append(audio_data)
 
 
 # ─── Agent entrypoint ──────────────────────────────────────

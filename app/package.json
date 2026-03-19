@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently --names frontend,agent --prefix-colors cyan,magenta \"pnpm dev:frontend\" \"pnpm dev:agent\"",
     "dev:frontend": "vite",
-    "dev:agent": "cd .. && python -m agent.worker dev",
+    "dev:agent": "cd .. && export $(grep -v '^#' app/.env | grep -v '^VITE_' | xargs) && python3 -m agent.worker dev",
     "build": "tsc --noEmit && vite build",
     "lint": "eslint .",
     "test": "vitest run",

@@ -99,6 +99,16 @@ export function saveLocalBaseline(baseline: CognitiveLoadBaseline): void {
   save(KEYS.baselines, baselines);
 }
 
+// ─── Active Pilot Persistence ─────────────────────────────
+
+export function saveActivePilotId(id: string): void {
+  localStorage.setItem('hpt-active-pilot-id', id);
+}
+
+export function loadActivePilotId(): string | null {
+  return localStorage.getItem('hpt-active-pilot-id');
+}
+
 // ─── Online status ─────────────────────────────────────────
 
 export function isOnline(): boolean {

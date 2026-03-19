@@ -5,8 +5,11 @@ import { DrillTimer } from './DrillTimer';
 import { DecisionPrompt } from './DecisionPrompt';
 import { AnthemButton } from '@/components/shared/AnthemButton';
 import { evaluatePredictResponse } from '@/services/pilot-predict';
-import type { DecisionPointEvent, PredictSuggestionEvent } from '@/types';
-import { useState } from 'react';
+import { VoicePanel } from '@/components/voice/VoicePanel';
+import { useVoiceStore } from '@/stores/voice-store';
+import { useATCEngine } from '@/hooks/useATCEngine';
+import type { DecisionPointEvent, PredictSuggestionEvent, ATCInstructionEvent } from '@/types';
+import { useState, useEffect, useRef } from 'react';
 
 export function DrillActiveView() {
   const {
@@ -20,7 +23,24 @@ export function DrillActiveView() {
     complete,
   } = useDrillRunner();
 
+  const livekitConnected = useVoiceStore((s) => s.livekitConnected);
+  const { speakATCInstruction } = useATCEngine();
   const [predictHandled, setPredictHandled] = useState(false);
+  const atcSpokenRef = useRef<number>(-1);
+
+  // Trigger ATC TTS when an atc_instruction event becomes active and LiveKit is connected
+  useEffect(() => {
+    if (
+      currentEvent?.type === 'atc_instruction' &&
+      livekitConnected &&
+      atcSpokenRef.current !== currentEventIndex
+    ) {
+      atcSpokenRef.current = currentEventIndex;
+      const atcEvent = currentEvent as ATCInstructionEvent;
+      void speakATCInstruction(atcEvent.prompt, atcEvent.keywords);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEvent, currentEventIndex, livekitConnected]);
 
   if (!activeDrill || !currentEvent || !startTime) return null;
 
@@ -63,8 +83,47 @@ export function DrillActiveView() {
     );
   }
 
-  // ATC Instruction event — keyboard/click fallback
+  // ATC Instruction event — voice mode or keyboard fallback
   if (currentEvent.type === 'atc_instruction') {
+    // When LiveKit is connected, show voice panel alongside the ATC prompt
+    if (livekitConnected) {
+      return (
+        <div className="flex-1 flex">
+          <div className="flex-1 flex flex-col">
+            <DrillHUD
+              drill={activeDrill.title}
+              eventIndex={currentEventIndex}
+              totalEvents={totalEvents}
+              startTime={startTime}
+              duration={activeDrill.duration}
+            />
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="max-w-md w-full rounded-lg border border-[var(--anthem-border)] bg-[var(--anthem-bg-secondary)] p-6">
+                <div className="text-xs text-[var(--anthem-cyan)] font-mono uppercase mb-2">
+                  ATC Communication
+                </div>
+                <p className="text-sm text-[var(--anthem-text-primary)] mb-4">
+                  {currentEvent.prompt}
+                </p>
+                <p className="text-xs text-[var(--anthem-text-secondary)] mb-4">
+                  Use PTT (spacebar) to respond via voice.
+                </p>
+                <AnthemButton
+                  variant="primary"
+                  className="w-full"
+                  onClick={handleAdvanceOrComplete}
+                >
+                  Continue
+                </AnthemButton>
+              </div>
+            </div>
+          </div>
+          <VoicePanel />
+        </div>
+      );
+    }
+
+    // Keyboard fallback when voice is unavailable
     return (
       <div className="flex-1 flex flex-col">
         <DrillHUD

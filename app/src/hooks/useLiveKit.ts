@@ -126,6 +126,14 @@ export function useLiveKit() {
           setDataHandler(handleDataMessage);
           await connectToRoom(LIVEKIT_URL, data.token as string);
           setLivekitConnected(true);
+
+          // Send stored baseline to agent if available
+          const { useAssessmentStore } = await import('@/stores/assessment-store');
+          const baseline = useAssessmentStore.getState().cognitiveLoadBaseline;
+          if (baseline && baseline.sampleCount > 0) {
+            const { sendBaseline } = await import('@/services/livekit-client');
+            sendBaseline(baseline as unknown as Record<string, unknown>);
+          }
         } catch (err) {
           console.error('[useLiveKit] Connection failed:', err);
           connectAttempted.current = false;
