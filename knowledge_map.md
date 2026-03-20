@@ -188,7 +188,7 @@ Every file in the project, grouped by feature pipeline.
 - `supabase/seed.sql` — Demo pilots, sample drill results, population baseline data
 
 ### Edge Functions
-- `supabase/functions/atc/index.ts` — Claude API proxy: ATCContext → ATC instruction + expected readback (streaming)
+- `supabase/functions/atc/index.ts` — OpenAI API proxy (gpt-4o-mini): ATCContext → ATC instruction + expected readback
 - `supabase/functions/livekit-token/index.ts` — LiveKit room access token generation, scoped to room + pilot
 
 ---

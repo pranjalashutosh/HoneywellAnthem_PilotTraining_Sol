@@ -1,8 +1,8 @@
-// T4.6 — Claude API proxy Edge Function
+// T4.6 — OpenAI API proxy Edge Function
 // Receives scenario context, returns ATC instruction + expected readback
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import Anthropic from "npm:@anthropic-ai/sdk@0.39";
+import OpenAI from "npm:openai@4.78";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,20 +17,21 @@ interface ATCConversationEntry {
   timestamp: number;
 }
 
-interface ATCContext {
+// Matches the payload shape from atc-engine.ts in the browser
+interface ATCRequestPayload {
   facility: string;
   sector: string;
   callsign: string;
-  altitude: number;
-  heading: number;
-  frequency: number;
-  flightPhase: string;
   conversationHistory: ATCConversationEntry[];
-  drill: {
-    atcConstraints: string;
-    traffic: string[];
-    weather: string;
+  drillConstraints: string;
+  currentState: {
+    altitude: number;
+    heading: number;
+    frequency: number;
+    phase: string;
   };
+  traffic: string[];
+  weather: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -46,10 +47,10 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+      JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,21 +59,21 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const context: ATCContext = await req.json();
+    const body: ATCRequestPayload = await req.json();
 
-    const systemPrompt = `You are an ATC controller at ${context.facility}, sector ${context.sector}.
-You are communicating with aircraft ${context.callsign}.
+    const systemPrompt = `You are an ATC controller at ${body.facility}, sector ${body.sector}.
+You are communicating with aircraft ${body.callsign}.
 
 Current aircraft state:
-- Altitude: ${context.altitude} feet
-- Heading: ${context.heading} degrees
-- Frequency: ${context.frequency} MHz
-- Flight phase: ${context.flightPhase}
+- Altitude: ${body.currentState.altitude} feet
+- Heading: ${body.currentState.heading} degrees
+- Frequency: ${body.currentState.frequency} MHz
+- Flight phase: ${body.currentState.phase}
 
 Scenario constraints:
-- ${context.drill.atcConstraints}
-- Traffic: ${context.drill.traffic.join("; ")}
-- Weather: ${context.drill.weather}
+- ${body.drillConstraints}
+- Traffic: ${(body.traffic ?? []).join("; ") || "None reported"}
+- Weather: ${body.weather || "Not specified"}
 
 Rules:
 1. Use standard FAA/ICAO phraseology
@@ -84,18 +85,20 @@ Rules:
 
 Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`;
 
-    const conversationMessages = context.conversationHistory.map((entry) => ({
-      role: entry.role === "atc" ? ("assistant" as const) : ("user" as const),
-      content: entry.text,
-    }));
+    const conversationMessages = (body.conversationHistory ?? []).map(
+      (entry) => ({
+        role: entry.role === "atc" ? ("assistant" as const) : ("user" as const),
+        content: entry.text,
+      })
+    );
 
-    const client = new Anthropic({ apiKey });
+    const client = new OpenAI({ apiKey });
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
       max_tokens: 512,
-      system: systemPrompt,
       messages: [
+        { role: "system", content: systemPrompt },
         ...conversationMessages,
         {
           role: "user",
@@ -105,12 +108,12 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`;
       ],
     });
 
-    const textBlock = message.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    const text = completion.choices[0]?.message?.content;
+    if (!text) {
+      throw new Error("No text response from OpenAI");
     }
 
-    const parsed = JSON.parse(textBlock.text);
+    const parsed = JSON.parse(text);
 
     return new Response(
       JSON.stringify({

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -58,9 +59,14 @@ class ATCAgentWorker:
         self._participant: rtc.RemoteParticipant | None = None
         self._audio_stream: rtc.AudioStream | None = None
 
+        # Persistent ATC audio track — published once, reused for all instructions
+        self._atc_source: rtc.AudioSource | None = None
+        self._atc_track: rtc.LocalAudioTrack | None = None
+        self._atc_track_published: bool = False
+
     async def start(self, ctx: agents.JobContext) -> None:
         """Called when the agent joins a room."""
-        logger.info("Agent starting in room %s", ctx.room.name)
+        logger.info("=== Agent starting in room %s ===", ctx.room.name)
         self._room = ctx.room
 
         # Set pilot ID from room metadata if available
@@ -69,9 +75,12 @@ class ATCAgentWorker:
                 meta = json.loads(ctx.room.metadata)
                 pilot_id = meta.get("pilotId", "unknown")
                 self._baseline = CognitiveLoadBaseline(pilot_id=pilot_id)
-                logger.info("Pilot ID from room metadata: %s", pilot_id)
+                logger.info("[INIT] Pilot ID from room metadata: %s", pilot_id)
             except json.JSONDecodeError:
-                pass
+                logger.warning("[INIT] Could not parse room metadata")
+
+        # Pre-publish a persistent ATC audio track so the browser subscribes once
+        await self._publish_atc_track()
 
         # Listen for data channel messages from browser
         ctx.room.on("data_received", self._on_data_received)
@@ -79,9 +88,31 @@ class ATCAgentWorker:
         # Listen for track subscriptions (pilot's mic)
         ctx.room.on("track_subscribed", self._on_track_subscribed)
 
-        logger.info("Agent ready, waiting for participants")
+        logger.info("[INIT] Agent ready — ATC track published, waiting for participants")
 
-    async def _on_track_subscribed(
+    async def _publish_atc_track(self) -> None:
+        """Create and publish a persistent audio track for ATC voice output."""
+        if not self._room or self._atc_track_published:
+            return
+
+        try:
+            self._atc_source = rtc.AudioSource(SAMPLE_RATE, 1)
+            self._atc_track = rtc.LocalAudioTrack.create_audio_track(
+                "atc-audio", self._atc_source
+            )
+            options = rtc.TrackPublishOptions()
+            await self._room.local_participant.publish_track(
+                self._atc_track, options
+            )
+            self._atc_track_published = True
+            logger.info(
+                "[ATC-TRACK] Published persistent ATC audio track (sample_rate=%d)",
+                SAMPLE_RATE,
+            )
+        except Exception:
+            logger.exception("[ATC-TRACK] Failed to publish ATC audio track")
+
+    def _on_track_subscribed(
         self,
         track: rtc.Track,
         publication: rtc.RemoteTrackPublication,
@@ -103,24 +134,20 @@ class ATCAgentWorker:
         self._audio_stream = rtc.AudioStream(
             track, sample_rate=16000, num_channels=1
         )
-        import asyncio
-        asyncio.ensure_future(self._consume_audio_frames())
+        asyncio.create_task(self._consume_audio_frames())
 
-    def _on_data_received(
-        self,
-        data: bytes,
-        participant: rtc.RemoteParticipant | None,
-        kind: rtc.DataPacketKind,
-    ) -> None:
+    def _on_data_received(self, data_packet: rtc.DataPacket) -> None:
         """Dispatch incoming data channel messages."""
         try:
-            message = json.loads(data.decode("utf-8"))
+            message = json.loads(data_packet.data.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
-            logger.warning("Invalid data channel message")
+            logger.warning("[DATA-CH] Invalid data channel message (raw=%d bytes)", len(data_packet.data))
             return
 
         msg_type = message.get("type")
         payload = message.get("payload", {})
+        sender = data_packet.participant.identity if data_packet.participant else "unknown"
+        logger.info("[DATA-CH] Received %s from %s", msg_type, sender)
 
         if msg_type == MSG_PTT_START:
             self._handle_ptt_start(payload)
@@ -152,8 +179,6 @@ class ATCAgentWorker:
         logger.info("PTT END at %.3f", ptt_end_ts)
 
         # Process audio asynchronously
-        import asyncio
-
         asyncio.ensure_future(self._process_pilot_audio())
 
     def _handle_set_keywords(self, payload: dict) -> None:
@@ -169,12 +194,13 @@ class ATCAgentWorker:
         self._expected_readback = payload.get("expectedReadback", "")
 
         if not text:
-            logger.warning("Empty ATC instruction")
+            logger.warning("[ATC] Empty ATC instruction received — ignoring")
             return
 
-        logger.info("ATC instruction: %s", text[:80])
-
-        import asyncio
+        logger.info("[ATC] Received instruction to speak: '%s'", text[:100])
+        logger.info("[ATC] Expected readback: '%s'", self._expected_readback[:100])
+        logger.info("[ATC] Track published: %s, source ready: %s",
+                     self._atc_track_published, self._atc_source is not None)
 
         asyncio.ensure_future(self._speak_atc(text))
 
@@ -221,12 +247,28 @@ class ATCAgentWorker:
         )
 
     async def _speak_atc(self, text: str) -> None:
-        """Synthesize and play ATC instruction with radio static."""
+        """Synthesize and play ATC instruction with radio static.
+
+        Uses a persistent audio track (published once in start()) so the browser
+        subscribes once and the audio element stays attached. Waits for the full
+        audio duration to elapse before signalling ATC_SPEAK_END.
+        """
         if not self._room:
+            logger.error("[ATC-SPEAK] No room — cannot speak")
             return
 
+        # Ensure ATC track is published (lazy fallback if start() didn't do it)
+        if not self._atc_track_published or not self._atc_source:
+            logger.warning("[ATC-SPEAK] ATC track not ready — publishing now")
+            await self._publish_atc_track()
+            if not self._atc_source:
+                logger.error("[ATC-SPEAK] Failed to publish ATC track — aborting")
+                return
+
         try:
-            # Generate TTS audio
+            # ── Step 1: Generate TTS audio ────────────────────────
+            logger.info("[ATC-SPEAK] Requesting TTS for: '%s'", text[:80])
+            tts_start = time.time()
             tts_stream = self._tts.synthesize(text)
             audio_frames: list[np.ndarray] = []
 
@@ -235,22 +277,35 @@ class ATCAgentWorker:
                     frame_data = np.frombuffer(event.frame.data, dtype=np.int16)
                     audio_frames.append(frame_data)
 
+            tts_elapsed = time.time() - tts_start
+
             if not audio_frames:
-                logger.warning("TTS produced no audio")
+                logger.warning("[ATC-SPEAK] TTS produced no audio frames (elapsed=%.2fs)", tts_elapsed)
                 return
 
-            # Concatenate and apply radio static effect
+            total_samples = sum(len(f) for f in audio_frames)
+            logger.info(
+                "[ATC-SPEAK] TTS produced %d frames, %d samples (%.2fs of audio) in %.2fs",
+                len(audio_frames),
+                total_samples,
+                total_samples / SAMPLE_RATE,
+                tts_elapsed,
+            )
+
+            # ── Step 2: Apply radio static effect ─────────────────
             full_audio = np.concatenate(audio_frames)
             processed = apply_radio_static(full_audio, sample_rate=SAMPLE_RATE)
+            audio_duration_sec = len(processed) / SAMPLE_RATE
+            logger.info(
+                "[ATC-SPEAK] Post-processing complete — %.2fs of audio ready to stream",
+                audio_duration_sec,
+            )
 
-            # Publish audio to room
-            source = rtc.AudioSource(SAMPLE_RATE, 1)
-            track = rtc.LocalAudioTrack.create_audio_track("atc-audio", source)
-            options = rtc.TrackPublishOptions()
-            await self._room.local_participant.publish_track(track, options)
-
-            # Send processed audio frames
+            # ── Step 3: Capture frames to persistent AudioSource ──
             chunk_size = SAMPLE_RATE // 50  # 20ms chunks
+            num_chunks = 0
+            capture_start = time.time()
+
             for i in range(0, len(processed), chunk_size):
                 chunk = processed[i : i + chunk_size]
                 frame = rtc.AudioFrame(
@@ -259,14 +314,29 @@ class ATCAgentWorker:
                     num_channels=1,
                     samples_per_channel=len(chunk),
                 )
-                await source.capture_frame(frame)
+                await self._atc_source.capture_frame(frame)
+                num_chunks += 1
 
-            # Unpublish the track after playback
-            await self._room.local_participant.unpublish_track(track.sid)
-            logger.info("ATC playback complete")
+            capture_elapsed = time.time() - capture_start
+            logger.info(
+                "[ATC-SPEAK] Queued %d chunks (%.2fs) to AudioSource in %.3fs",
+                num_chunks,
+                audio_duration_sec,
+                capture_elapsed,
+            )
+
+            # ── Step 4: Wait for real-time playback to complete ───
+            # capture_frame() queues frames but WebRTC streams them in real-time.
+            # We must wait for the full audio duration before signalling end,
+            # otherwise the browser hears nothing (the old bug).
+            wait_sec = max(0, audio_duration_sec - capture_elapsed + 0.3)
+            logger.info("[ATC-SPEAK] Waiting %.2fs for real-time playback to finish", wait_sec)
+            await asyncio.sleep(wait_sec)
+
+            logger.info("[ATC-SPEAK] Playback complete for: '%s'", text[:60])
 
         except Exception:
-            logger.exception("Error during ATC speech synthesis")
+            logger.exception("[ATC-SPEAK] Error during ATC speech synthesis")
         finally:
             # Always send ATC_SPEAK_END so the browser unlocks PTT
             self._atc_speak_end_ts = time.time()
@@ -274,8 +344,9 @@ class ATCAgentWorker:
                 await self._send_message(
                     MSG_ATC_SPEAK_END, {"timestamp": self._atc_speak_end_ts}
                 )
+                logger.info("[ATC-SPEAK] Sent ATC_SPEAK_END to browser")
             except Exception:
-                logger.warning("Failed to send ATC_SPEAK_END")
+                logger.warning("[ATC-SPEAK] Failed to send ATC_SPEAK_END")
 
     async def _process_pilot_audio(self) -> None:
         """Process captured pilot audio: STT + voice analysis + assessment."""
@@ -491,13 +562,15 @@ class ATCAgentWorker:
     async def _send_message(self, msg_type: str, payload: dict) -> None:
         """Send a data channel message to the browser."""
         if not self._room:
+            logger.warning("[DATA-CH] Cannot send %s — no room", msg_type)
             return
 
         message = json.dumps({"type": msg_type, "payload": payload})
         await self._room.local_participant.publish_data(
             message.encode("utf-8"),
-            kind=rtc.DataPacketKind.KIND_RELIABLE,
+            reliable=True,
         )
+        logger.debug("[DATA-CH] Sent %s (%d bytes)", msg_type, len(message))
 
     async def _consume_audio_frames(self) -> None:
         """Consume audio frames from the AudioStream, buffering when PTT active."""
@@ -519,11 +592,9 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     """LiveKit agent entrypoint."""
     logger.info("Agent entrypoint called for room %s", ctx.room.name)
 
+    await ctx.connect()
     worker = ATCAgentWorker()
     await worker.start(ctx)
-
-    # Keep agent alive
-    await ctx.connect()
 
 
 def main() -> None:

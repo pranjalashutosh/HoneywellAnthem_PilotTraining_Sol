@@ -12,15 +12,22 @@ import type { ATCContext, ATCInstruction } from '@/types';
 export async function generateAndSpeakATCInstruction(
   context: ATCContext,
 ): Promise<ATCInstruction | null> {
+  console.info('[atc-engine] Generating ATC instruction for', context.callsign);
+
   // Generate instruction via Edge Function
   const instruction = await generateATCInstruction(context);
 
   if (!instruction) {
+    console.warn('[atc-engine] No instruction generated — returning null');
     return null;
   }
 
+  console.info('[atc-engine] Instruction: "%s"', instruction.instruction);
+  console.info('[atc-engine] Expected readback: "%s"', instruction.expectedReadback);
+
   // Send to agent for TTS
-  sendATCInstruction(instruction.instruction, instruction.expectedReadback);
+  console.info('[atc-engine] Sending ATC_INSTRUCTION to agent via data channel');
+  await sendATCInstruction(instruction.instruction, instruction.expectedReadback);
 
   return instruction;
 }
@@ -32,11 +39,14 @@ export async function generateATCInstruction(
   context: ATCContext,
 ): Promise<ATCInstruction | null> {
   if (!isSupabaseConfigured()) {
-    console.warn('[atc-engine] Supabase not configured, using fallback instruction');
+    console.warn('[atc-engine] Supabase not configured — using fallback instruction');
     return createFallbackInstruction(context);
   }
 
   try {
+    console.info('[atc-engine] Invoking Edge Function /atc (facility=%s, callsign=%s)',
+      context.facility, context.callsign);
+
     const { data, error } = await supabase.functions.invoke('atc', {
       body: {
         facility: context.facility,
@@ -56,13 +66,14 @@ export async function generateATCInstruction(
     });
 
     if (error) {
-      console.error('[atc-engine] Edge function error:', error);
+      console.error('[atc-engine] Edge Function /atc returned error:', error);
       return createFallbackInstruction(context);
     }
 
+    console.info('[atc-engine] Edge Function /atc success — instruction received');
     return data as ATCInstruction;
   } catch (err) {
-    console.error('[atc-engine] Failed to generate ATC instruction:', err);
+    console.error('[atc-engine] Edge Function /atc call failed:', err);
     return createFallbackInstruction(context);
   }
 }

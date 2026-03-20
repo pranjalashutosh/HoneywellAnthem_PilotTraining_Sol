@@ -7,6 +7,8 @@ import {
   disconnect,
   isConnected as checkConnected,
   setDataHandler,
+  publishMicTrack,
+  unpublishMicTrack,
   type DataChannelMessage,
 } from '@/services/livekit-client';
 import { useVoiceStore } from '@/stores/voice-store';
@@ -40,6 +42,7 @@ export function useLiveKit() {
   const handleDataMessage = useCallback(
     (message: DataChannelMessage) => {
       const { type, payload } = message;
+      console.info('[useLiveKit] Handling agent message:', type);
 
       switch (type) {
         case MSG_INTERIM_TRANSCRIPT: {
@@ -49,10 +52,13 @@ export function useLiveKit() {
         }
 
         case MSG_FINAL_TRANSCRIPT: {
+          const text = payload.text as string;
+          console.info('[useLiveKit] Final transcript: "%s" (confidence=%.2f)',
+            text, (payload.meanConfidence as number) ?? 0);
           const entry: TranscriptEntry = {
             id: crypto.randomUUID(),
             speaker: 'pilot',
-            text: payload.text as string,
+            text,
             words: (payload.words as ConfidenceAnnotatedWord[]) ?? [],
             timestamp: (payload.timestamp as number) ?? Date.now(),
             isFinal: true,
@@ -63,11 +69,13 @@ export function useLiveKit() {
         }
 
         case MSG_ATC_SPEAK_END: {
+          console.info('[useLiveKit] ATC_SPEAK_END received — unlocking PTT');
           setATCSpeaking(false);
           break;
         }
 
         case MSG_ASSESSMENT_RESULT: {
+          console.info('[useLiveKit] Assessment result received');
           processAssessmentResult(
             payload as unknown as Parameters<typeof processAssessmentResult>[0],
           );
@@ -75,6 +83,7 @@ export function useLiveKit() {
         }
 
         case MSG_BASELINE_UPDATE: {
+          console.info('[useLiveKit] Baseline update received');
           processBaselineUpdate(
             payload as unknown as Parameters<typeof processBaselineUpdate>[0],
           );
@@ -92,9 +101,10 @@ export function useLiveKit() {
   useEffect(() => {
     if (phase === 'active' && !livekitConnected && !connectAttempted.current) {
       connectAttempted.current = true;
+      console.info('[useLiveKit] Drill active — initiating LiveKit connection');
 
       if (!LIVEKIT_URL) {
-        console.warn('[useLiveKit] VITE_LIVEKIT_URL not set, running without voice');
+        console.warn('[useLiveKit] VITE_LIVEKIT_URL not set — running without voice');
         return;
       }
 
@@ -103,16 +113,20 @@ export function useLiveKit() {
         try {
           const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
           if (!isSupabaseConfigured()) {
-            console.warn('[useLiveKit] Supabase not configured, skipping LiveKit');
+            console.warn('[useLiveKit] Supabase not configured — skipping LiveKit');
             return;
           }
 
           const pilotStore = (await import('@/stores/pilot-store')).usePilotStore.getState();
           const scenarioStore = useScenarioStore.getState();
+          const roomName = `drill-${scenarioStore.activeDrill?.id ?? 'unknown'}`;
+
+          console.info('[useLiveKit] Requesting token for room=%s, pilot=%s',
+            roomName, pilotStore.activePilot?.name ?? 'Pilot');
 
           const { data, error } = await supabase.functions.invoke('livekit-token', {
             body: {
-              roomName: `drill-${scenarioStore.activeDrill?.id ?? 'unknown'}`,
+              roomName,
               participantName: pilotStore.activePilot?.name ?? 'Pilot',
               pilotId: pilotStore.activePilot?.id ?? 'unknown',
             },
@@ -123,14 +137,20 @@ export function useLiveKit() {
             return;
           }
 
+          console.info('[useLiveKit] Token received — connecting to', LIVEKIT_URL);
           setDataHandler(handleDataMessage);
           await connectToRoom(LIVEKIT_URL, data.token as string);
+          console.info('[useLiveKit] Publishing mic track');
+          await publishMicTrack();
+          console.info('[useLiveKit] Mic track published');
           setLivekitConnected(true);
+          console.info('[useLiveKit] Connected and ready');
 
           // Send stored baseline to agent if available
           const { useAssessmentStore } = await import('@/stores/assessment-store');
           const baseline = useAssessmentStore.getState().cognitiveLoadBaseline;
           if (baseline && baseline.sampleCount > 0) {
+            console.info('[useLiveKit] Sending stored baseline to agent');
             const { sendBaseline } = await import('@/services/livekit-client');
             sendBaseline(baseline as unknown as Record<string, unknown>);
           }
@@ -143,8 +163,11 @@ export function useLiveKit() {
 
     // Disconnect when drill ends
     if (phase === 'idle' && livekitConnected) {
+      console.info('[useLiveKit] Drill idle — disconnecting LiveKit');
       connectAttempted.current = false;
-      void disconnect().then(() => setLivekitConnected(false));
+      void unpublishMicTrack().catch(() => {/* ignore if already disconnected */}).then(() =>
+        disconnect().then(() => setLivekitConnected(false))
+      );
     }
   }, [phase, livekitConnected, setLivekitConnected, handleDataMessage]);
 
@@ -152,12 +175,14 @@ export function useLiveKit() {
     async (url: string, token: string) => {
       setDataHandler(handleDataMessage);
       await connectToRoom(url, token);
+      await publishMicTrack();
       setLivekitConnected(true);
     },
     [setLivekitConnected, handleDataMessage],
   );
 
   const disconnectRoom = useCallback(async () => {
+    await unpublishMicTrack().catch(() => {/* ignore if already disconnected */});
     await disconnect();
     setLivekitConnected(false);
     connectAttempted.current = false;

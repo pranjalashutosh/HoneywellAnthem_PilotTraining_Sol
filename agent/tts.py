@@ -16,11 +16,31 @@ ATC_MODEL_ID = "eleven_turbo_v2"
 
 
 def create_tts() -> TTS:
-    """Create an ElevenLabs TTS instance configured for ATC voice."""
-    logger.info("Creating ElevenLabs TTS with voice=%s", ATC_VOICE_ID)
+    """Create an ElevenLabs TTS instance configured for ATC voice.
+
+    The livekit-plugins-elevenlabs SDK reads ELEVEN_API_KEY, but our .env
+    uses ELEVENLABS_API_KEY.  We resolve either name and pass it explicitly.
+    We also force pcm_16000 encoding so the output sample rate matches
+    SAMPLE_RATE (16 kHz) used by voice_analysis and the AudioSource.
+    """
+    import os
+
+    # Accept either env var name
+    api_key = os.environ.get("ELEVEN_API_KEY") or os.environ.get("ELEVENLABS_API_KEY")
+    logger.info(
+        "[TTS] Creating ElevenLabs TTS — voice=%s, model=%s, encoding=pcm_16000, api_key=%s",
+        ATC_VOICE_ID,
+        ATC_MODEL_ID,
+        "set" if api_key else "MISSING",
+    )
+    if not api_key:
+        logger.error("[TTS] Neither ELEVEN_API_KEY nor ELEVENLABS_API_KEY is set — TTS will fail")
+
     return TTS(
         voice_id=ATC_VOICE_ID,
-        model_id=ATC_MODEL_ID,
+        model=ATC_MODEL_ID,
+        encoding="pcm_16000",
+        api_key=api_key or "",
     )
 
 
@@ -30,6 +50,8 @@ def apply_radio_static(
     noise_level: float = 0.02,
     bandpass_low: int = 300,
     bandpass_high: int = 3400,
+    *,
+    _logger: logging.Logger = logger,
 ) -> np.ndarray:
     """Apply radio static effect to audio data.
 

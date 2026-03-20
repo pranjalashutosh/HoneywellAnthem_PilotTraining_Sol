@@ -63,28 +63,78 @@ export async function connectToRoom(
   room.on(RoomEvent.DataReceived, (data: Uint8Array) => {
     try {
       const message = JSON.parse(new TextDecoder().decode(data)) as DataChannelMessage;
+      console.info('[livekit] Data received:', message.type);
       dataHandler?.(message);
     } catch {
       console.warn('[livekit] Invalid data channel message');
     }
   });
 
-  // Listen for agent audio tracks
+  // Listen for agent audio tracks — this is how ATC voice reaches the speaker
   room.on(RoomEvent.TrackSubscribed, (...args: unknown[]) => {
     const track = args[0] as RemoteTrack;
+    const publication = args[1] as { trackName?: string };
+    const participant = args[2] as { identity?: string };
+
+    console.info(
+      '[livekit] TrackSubscribed: kind=%s, name=%s, from=%s',
+      track.kind === Track.Kind.Audio ? 'audio' : 'video',
+      publication?.trackName ?? 'unknown',
+      participant?.identity ?? 'unknown',
+    );
+
     if (track.kind === Track.Kind.Audio) {
+      // Remove any previously attached ATC audio element
+      const existing = document.getElementById('atc-audio');
+      if (existing) {
+        console.info('[livekit] Removing previous atc-audio element');
+        existing.remove();
+      }
+
       const element = track.attach();
       element.id = 'atc-audio';
+      element.volume = 1.0;
       document.body.appendChild(element);
+      console.info('[livekit] ATC audio element attached to DOM (volume=1.0)');
+
+      // Handle browser autoplay policy — if the element is paused, try to play
+      if (element.paused) {
+        element.play().then(() => {
+          console.info('[livekit] ATC audio element play() succeeded');
+        }).catch((err) => {
+          console.warn('[livekit] ATC audio autoplay blocked:', err.message,
+            '— will retry on next user interaction');
+          // Resume on next user interaction (click/keypress)
+          const resumeAudio = () => {
+            element.play().then(() => {
+              console.info('[livekit] ATC audio resumed after user interaction');
+            }).catch(() => { /* ignore */ });
+            document.removeEventListener('click', resumeAudio);
+            document.removeEventListener('keydown', resumeAudio);
+          };
+          document.addEventListener('click', resumeAudio, { once: true });
+          document.addEventListener('keydown', resumeAudio, { once: true });
+        });
+      }
     }
   });
 
   room.on(RoomEvent.TrackUnsubscribed, (...args: unknown[]) => {
     const track = args[0] as RemoteTrack;
+    console.info('[livekit] TrackUnsubscribed: kind=%s',
+      track.kind === Track.Kind.Audio ? 'audio' : 'video');
     track.detach().forEach((el) => el.remove());
   });
 
+  // Log connection state changes
+  room.on(RoomEvent.ConnectionStateChanged, (...args: unknown[]) => {
+    const state = args[0] as string;
+    console.info('[livekit] Connection state changed:', state);
+  });
+
+  console.info('[livekit] Connecting to room at', url);
   await room.connect(url, token);
+  console.info('[livekit] Connected to room successfully');
   return room;
 }
 
@@ -104,13 +154,14 @@ export async function unpublishMicTrack(): Promise<void> {
 
 export async function sendDataMessage(type: string, payload: Record<string, unknown>): Promise<void> {
   if (!room || room.state !== ConnectionState.Connected) {
-    console.warn('[livekit] Cannot send data: not connected');
+    console.warn('[livekit] Cannot send %s: not connected (state=%s)', type, room?.state ?? 'no room');
     return;
   }
 
   const message: DataChannelMessage = { type, payload };
   const data = new TextEncoder().encode(JSON.stringify(message));
 
+  console.info('[livekit] Sending data message:', type);
   await room.localParticipant.publishData(data, {
     reliable: true,
   });
@@ -148,8 +199,8 @@ export function sendSetKeywords(keywords: string[]): void {
   void sendDataMessage(MSG_SET_KEYWORDS, { keywords });
 }
 
-export function sendATCInstruction(text: string, expectedReadback: string): void {
-  void sendDataMessage(MSG_ATC_INSTRUCTION, {
+export async function sendATCInstruction(text: string, expectedReadback: string): Promise<void> {
+  await sendDataMessage(MSG_ATC_INSTRUCTION, {
     text,
     expectedReadback,
     atcCallsign: '',

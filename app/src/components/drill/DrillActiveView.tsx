@@ -30,6 +30,11 @@ export function DrillActiveView() {
 
   // Trigger ATC TTS when an atc_instruction event becomes active and LiveKit is connected
   useEffect(() => {
+    if (currentEvent?.type === 'atc_instruction') {
+      console.info('[DrillActiveView] ATC event detected — index=%d, livekit=%s, alreadySpoken=%s',
+        currentEventIndex, livekitConnected, atcSpokenRef.current === currentEventIndex);
+    }
+
     if (
       currentEvent?.type === 'atc_instruction' &&
       livekitConnected &&
@@ -37,7 +42,10 @@ export function DrillActiveView() {
     ) {
       atcSpokenRef.current = currentEventIndex;
       const atcEvent = currentEvent as ATCInstructionEvent;
-      void speakATCInstruction(atcEvent.prompt, atcEvent.keywords);
+      console.info('[DrillActiveView] Triggering speakATCInstruction for event %d', currentEventIndex);
+      speakATCInstruction(atcEvent.prompt, atcEvent.keywords).catch((err) =>
+        console.error('[DrillActiveView] speakATCInstruction failed:', err),
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent, currentEventIndex, livekitConnected]);

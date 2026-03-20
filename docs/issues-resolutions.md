@@ -255,6 +255,191 @@ Comprehensive log of all issues encountered during development and their resolut
 
 ---
 
+### ISS-016: Agent Crash — ElevenLabs TTS `model_id` Parameter Renamed
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** Agent crashes immediately on every job with `TypeError: TTS.__init__() got an unexpected keyword argument 'model_id'`. No ATC audio plays. Agent process exits with "job crashed".
+
+**Root Cause:** `livekit-plugins-elevenlabs` v1.4.6 renamed the constructor parameter from `model_id` to `model`. The code in `agent/tts.py` was using the old name.
+
+**Resolution:** Changed `model_id=ATC_MODEL_ID` to `model=ATC_MODEL_ID` in `create_tts()`.
+
+**Files Changed:** `agent/tts.py`
+
+---
+
+### ISS-017: Agent TTS Fails — Wrong ElevenLabs API Key Env Var Name
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** After fixing ISS-016, TTS initialization fails with "ElevenLabs API key is required". The `.env` file has the key set, yet the plugin doesn't find it.
+
+**Root Cause:** The `livekit-plugins-elevenlabs` SDK reads `ELEVEN_API_KEY` from the environment, but the project's `.env` exports `ELEVENLABS_API_KEY`. The `pnpm dev:agent` script exports all non-`VITE_` vars from `.env`, so `ELEVENLABS_API_KEY` is exported — but the plugin never reads that name.
+
+**Resolution:** `create_tts()` now reads from either `ELEVEN_API_KEY` or `ELEVENLABS_API_KEY` (whichever is set) and passes it explicitly via the `api_key=` constructor parameter.
+
+**Files Changed:** `agent/tts.py`
+
+---
+
+### ISS-018: TTS Audio Sample Rate Mismatch (22050 Hz vs 16000 Hz)
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** Even with ISS-016 and ISS-017 fixed, ATC audio would play back garbled — wrong pitch and ~38% slower than intended.
+
+**Root Cause:** The ElevenLabs TTS plugin defaults to `mp3_22050_32` encoding (22050 Hz output), but the agent's `AudioSource`, `apply_radio_static()`, and `SAMPLE_RATE` constant all assume 16000 Hz. The mismatch meant 22050 Hz audio was being reinterpreted as 16000 Hz data — pitch-shifted and time-stretched.
+
+**Resolution:** Explicitly set `encoding="pcm_16000"` in the TTS constructor so the output sample rate matches `SAMPLE_RATE` (16000 Hz) used throughout the voice pipeline.
+
+**Files Changed:** `agent/tts.py`
+
+---
+
+### ISS-019: ATC Audio Track Unpublished Before Playback Completes
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** Agent runs TTS successfully (logs show audio frames generated), but browser never hears the audio. The `TrackSubscribed` event fires but audio element plays silence.
+
+**Root Cause:** In `worker.py` `_speak_atc()`, a new `AudioSource` + `LocalAudioTrack` was created for every instruction, all frames were queued via `capture_frame()` (near-instantly), then `unpublish_track()` was called immediately. Since `capture_frame()` only *queues* frames and WebRTC streams them in real-time (~20ms per chunk), unpublishing killed the track before any audio was transmitted. Additionally, each new track triggered a subscribe/unsubscribe cycle on the browser, racing with audio element attachment.
+
+**Resolution:**
+1. **Persistent ATC audio track**: A single `AudioSource` + `LocalAudioTrack` is now created and published once in `start()`, then reused for all instructions. The browser subscribes once and the `<audio>` element stays attached.
+2. **Playback wait**: After queuing all frames, the agent now `await asyncio.sleep(audio_duration + 0.3s)` — waiting for real-time WebRTC transmission to complete before sending `ATC_SPEAK_END`.
+3. **Lazy fallback**: If the track isn't published by `start()`, `_speak_atc()` publishes it on first use.
+
+**Files Changed:** `agent/worker.py`
+
+---
+
+### ISS-020: Browser Autoplay Policy Blocks ATC Audio Element
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** ATC audio element is attached to the DOM but produces no sound. Browser console shows no errors (autoplay failures are silent in some browsers).
+
+**Root Cause:** When LiveKit's `track.attach()` creates an `<audio>` element, modern browsers may block autoplay if no prior user gesture has been registered for audio. The previous code never called `element.play()` or handled the rejection.
+
+**Resolution:**
+- After attaching the audio element, explicitly call `element.play()` with `.catch()` handler
+- If autoplay is blocked, register one-time `click` and `keydown` listeners to resume audio on the next user interaction (guaranteed since pilot uses PTT spacebar)
+- Set `element.volume = 1.0` explicitly
+- Remove any previously attached `atc-audio` element before creating a new one
+
+**Files Changed:** `app/src/services/livekit-client.ts`
+
+---
+
+### ISS-021: Insufficient Logging Across Voice Pipeline
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** When ATC audio failed, there was no way to determine which stage of the pipeline broke — Edge Function, data channel, TTS, audio track publishing, or browser playback. Debugging required guesswork.
+
+**Root Cause:** The voice pipeline spans 6+ files across browser and agent, with minimal logging at integration boundaries. Failures were silent or produced generic error messages without pipeline context.
+
+**Resolution:** Added structured `[TAG]` logging at every integration point across the pipeline:
+
+| File | Tags Added |
+|------|-----------|
+| `agent/worker.py` | `[INIT]`, `[ATC-TRACK]`, `[DATA-CH]`, `[ATC]`, `[ATC-SPEAK]` — logs TTS duration, frame count, audio duration, capture timing, playback wait, send confirmation |
+| `agent/tts.py` | `[TTS]` — logs API key presence, voice/model/encoding config |
+| `app/src/services/livekit-client.ts` | `[livekit]` — logs track subscribe/unsubscribe with kind/name/participant, connection state changes, data messages sent/received, autoplay handling |
+| `app/src/hooks/useLiveKit.ts` | `[useLiveKit]` — logs connection flow (token request, room connect, ready), all agent message types dispatched |
+| `app/src/hooks/useATCEngine.ts` | `[useATCEngine]` — logs instruction trigger, keyword updates, generation result |
+| `app/src/services/atc-engine.ts` | `[atc-engine]` — logs Edge Function invocation and response |
+| `app/src/components/drill/DrillActiveView.tsx` | `[DrillActiveView]` — logs ATC event detection, trigger conditions (livekit connected, already spoken) |
+
+**Files Changed:** `agent/worker.py`, `agent/tts.py`, `app/src/services/livekit-client.ts`, `app/src/hooks/useLiveKit.ts`, `app/src/hooks/useATCEngine.ts`, `app/src/services/atc-engine.ts`, `app/src/components/drill/DrillActiveView.tsx`
+
+---
+
+### ISS-022: Agent Crash on Room Join — Two Startup Bugs
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** LiveKit agent crashes immediately (~3ms) when a drill room is joined. Logs show two sequential errors: `Exception: cannot access local participant before connecting` followed by `ValueError` from `.on()` receiving an async callback.
+
+**Root Cause:** Two bugs in the agent startup sequence:
+
+1. **Room not connected when publishing ATC track:** `entrypoint()` called `await worker.start(ctx)` *before* `await ctx.connect()`. Inside `start()`, `_publish_atc_track()` tried to access `self._room.local_participant` on a room that wasn't connected yet.
+
+2. **Async callback registered with `.on()`:** `_on_track_subscribed` was declared as `async def` but registered via `ctx.room.on("track_subscribed", ...)`. The LiveKit SDK's `.on()` only accepts synchronous callbacks and raises `ValueError`.
+
+**Resolution:**
+1. Reordered `entrypoint()` to call `await ctx.connect()` **before** creating the worker and calling `await worker.start(ctx)`
+2. Converted `_on_track_subscribed` from `async def` to a sync `def` that wraps its async work (`_consume_audio_frames()`) in `asyncio.create_task()` instead of `asyncio.ensure_future()`
+
+**Files Changed:** `agent/worker.py`
+
+---
+
+### ISS-023: Data Channel Broken — LiveKit SDK v1.1.2 API Changes
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** Agent runs without errors after ISS-022 fix, but ATC audio never plays. The entire data channel pipeline is silently broken — the agent neither receives browser messages nor sends messages back.
+
+**Root Cause:** Two breaking API changes in `livekit` v1.1.2 (vs the older SDK the code was written for):
+
+1. **`data_received` event signature changed:** The event now passes a single `DataPacket` object (with `.data`, `.participant`, `.kind`, `.topic` fields) instead of three separate arguments `(data: bytes, participant: RemoteParticipant, kind: DataPacketKind)`. The EventEmitter's `emit()` detected the argument count mismatch and raised `TypeError` (which it re-raises), silently preventing the handler from ever being called. The agent never received `ATC_INSTRUCTION`, `PTT_START`, `SET_BASELINE`, or any other browser message.
+
+2. **`publish_data()` `kind=` parameter renamed to `reliable=`:** The method now uses `reliable: bool = True` instead of `kind: DataPacketKind`. Passing `kind=rtc.DataPacketKind.KIND_RELIABLE` raised `TypeError: unexpected keyword argument 'kind'`. The agent could not send `ATC_SPEAK_END`, `FINAL_TRANSCRIPT`, `ASSESSMENT_RESULT`, or `BASELINE_UPDATE` back to the browser.
+
+**Resolution:**
+1. Updated `_on_data_received(self, data_packet: rtc.DataPacket)` to accept the single `DataPacket` argument, accessing `.data`, `.participant`, `.kind` from it
+2. Changed `_send_message()` from `kind=rtc.DataPacketKind.KIND_RELIABLE` to `reliable=True`
+
+**Files Changed:** `agent/worker.py`
+
+---
+
+### ISS-024: No Audio Captured During PTT — Mic Track Never Published
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** Every PTT cycle ends with "No audio captured during PTT" in agent logs. The agent never receives pilot microphone audio.
+
+**Root Cause:** `publishMicTrack()` in `livekit-client.ts` was defined but never called. The browser connected to the LiveKit room and sent PTT data messages, but never published its microphone audio track. Without it:
+- Agent's `_on_track_subscribed()` never fired
+- `_audio_stream` was never created, `_consume_audio_frames()` never started
+- `_audio_buffer` was always empty when PTT ended
+
+**Resolution:**
+1. **`useLiveKit.ts`**: Imported `publishMicTrack` and `unpublishMicTrack` from `livekit-client`
+2. **Auto-connect path**: Added `await publishMicTrack()` after `connectToRoom()`, before `setLivekitConnected(true)`
+3. **Manual connect callback**: Same — `await publishMicTrack()` after `connectToRoom()`
+4. **Disconnect paths**: Added `unpublishMicTrack()` before `disconnect()` with `.catch()` guard to handle already-disconnected state
+
+**Files Changed:** `app/src/hooks/useLiveKit.ts`
+
+---
+
+### ISS-025: ATC Instruction Never Reaches Agent — Silent Fire-and-Forget Chain
+
+**Status:** RESOLVED
+**Date:** 2026-03-19
+**Symptom:** No `[DATA-CH] Received ATC_INSTRUCTION` in agent logs. TTS never runs, ATC track stays silent. No errors visible in browser console.
+
+**Root Cause:** The `speakATCInstruction()` call chain used fire-and-forget (`void`) at multiple levels, silently swallowing all errors:
+- `DrillActiveView.tsx`: `void speakATCInstruction(...)` dropped rejections
+- `livekit-client.ts`: `void sendDataMessage(...)` inside `sendATCInstruction` dropped errors
+- No try/catch in `useATCEngine.speakATCInstruction` around `buildContext()`
+
+If any step failed (Edge Function timeout, room not ready, context build error), the entire chain silently failed and no `ATC_INSTRUCTION` message was sent.
+
+**Resolution:**
+1. **`livekit-client.ts`**: Changed `sendATCInstruction` from `void sendDataMessage(...)` to `await sendDataMessage(...)` (made function async, returns Promise)
+2. **`atc-engine.ts`**: Added `await` before `sendATCInstruction(...)` so errors propagate through `generateAndSpeakATCInstruction`
+3. **`useATCEngine.ts`**: Wrapped `buildContext()` in try/catch to surface context-building failures
+4. **`DrillActiveView.tsx`**: Replaced `void speakATCInstruction(...)` with `.catch((err) => console.error(...))` so failures appear in the browser console
+
+**Files Changed:** `app/src/services/livekit-client.ts`, `app/src/services/atc-engine.ts`, `app/src/hooks/useATCEngine.ts`, `app/src/components/drill/DrillActiveView.tsx`
+
+---
+
 ## Open / Known Limitations
 
 ### LIM-001: Agent Requires Python Virtual Environment

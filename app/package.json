@@ -13,7 +13,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@livekit/components-react": "^2.8.0",
     "@supabase/supabase-js": "^2.49.0",
     "livekit-client": "^2.9.0",

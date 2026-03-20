@@ -27,7 +27,7 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │   (room, audio tracks,         (@supabase/supabase-js)             │
 │    data channel for PTT,        CRUD, analytics RPC,               │
 │    receives transcripts +        Edge Functions for                 │
-│    biomarker scores)             Claude API + LiveKit tokens        │
+│    biomarker scores)             OpenAI API + LiveKit tokens        │
 │             │                      │                                │
 └─────────────┼──────────────────────┼────────────────────────────────┘
               │ WebRTC               │ HTTPS
@@ -81,7 +81,7 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 | Voice STT | Deepgram Nova-2 (LiveKit plugin) | Native streaming, per-word confidence + timestamps, keyword boosting |
 | Voice TTS | ElevenLabs (LiveKit plugin) | Realistic ATC voice quality |
 | Voice analysis | librosa + numpy (Python agent) | F0 (yin/pyin), RMS, MFCC, spectral — all in one pipeline, research-grade |
-| LLM | Claude API (@anthropic-ai/sdk) | Contextual ATC instruction generation with scenario awareness |
+| LLM | OpenAI API (gpt-4o-mini) | Contextual ATC instruction generation with scenario awareness |
 | Backend | Supabase (Postgres + Edge Functions) | Managed DB, auto-generated REST API, Edge Functions for server-side secrets |
 | Package manager | pnpm (app) + pip/uv (agent) | Respective ecosystems |
 
@@ -112,7 +112,7 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │   ├── migrations/                 # PostgreSQL schema migrations
 │   │   └── 001_initial_schema.sql  # pilots, sessions, drill_results, readback_scores, baselines
 │   ├── functions/                  # Edge Functions (Deno)
-│   │   ├── atc/index.ts            # Claude API proxy (ANTHROPIC_API_KEY)
+│   │   ├── atc/index.ts            # OpenAI API proxy (OPENAI_API_KEY)
 │   │   └── livekit-token/index.ts  # LiveKit room token generation
 │   └── seed.sql                    # Sample drill data (optional)
 │
@@ -326,7 +326,7 @@ interface LatencyDecomposition {
 ATC instruction audio is generated and delivered through the LiveKit agent pipeline:
 
 ```
-1. ATC instruction text generated (via Claude API / Supabase Edge Function)
+1. ATC instruction text generated (via OpenAI API / Supabase Edge Function)
        ↓
 2. Instruction text sent to Python agent via LiveKit data channel
        ↓
@@ -352,7 +352,7 @@ Uses a male voice with moderate pace and slightly clipped cadence to simulate AT
 
 ---
 
-## Claude API — ATC Generation
+## OpenAI API — ATC Generation
 
 ### System Prompt Design
 
@@ -367,7 +367,7 @@ The ATC persona prompt (`agent/prompts/atc_system.py`) establishes:
 
 ### Request Flow
 
-ATC generation requests go through a Supabase Edge Function (`supabase/functions/atc/index.ts`), which holds the `ANTHROPIC_API_KEY` server-side.
+ATC generation requests go through a Supabase Edge Function (`supabase/functions/atc/index.ts`), which holds the `OPENAI_API_KEY` server-side.
 
 ```typescript
 // atc-engine.ts — calls Supabase Edge Function
@@ -886,7 +886,7 @@ Supabase replaces the Express + SQLite stack entirely. There is no `app/server/`
 
 Edge Functions run on Deno and access secrets via `Deno.env.get()`. The browser calls them via `supabase.functions.invoke()`.
 
-**`supabase/functions/atc/index.ts`** — Claude API proxy. Receives scenario context from the browser, calls the Anthropic API with the `ANTHROPIC_API_KEY`, returns ATC instruction + expected readback.
+**`supabase/functions/atc/index.ts`** — OpenAI API proxy. Receives scenario context from the browser, calls OpenAI (gpt-4o-mini) with the `OPENAI_API_KEY`, returns ATC instruction + expected readback.
 
 **`supabase/functions/livekit-token/index.ts`** — LiveKit room token generation. Uses `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` to mint a short-lived access token for the browser to join a LiveKit room.
 
@@ -899,7 +899,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...                      # Public anon key (safe for b
 VITE_LIVEKIT_URL=wss://your-project.livekit.cloud
 
 # Supabase Edge Function secrets (set via supabase secrets set)
-ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-proj-...
 LIVEKIT_API_KEY=...
 LIVEKIT_API_SECRET=...
 ELEVENLABS_API_KEY=...
@@ -1213,7 +1213,7 @@ The browser talks directly to Supabase Cloud and LiveKit Cloud — there is no l
 | Audio infrastructure | LiveKit Cloud (WebRTC) | DIY WebSocket + MediaRecorder | WebRTC transport, STUN/TURN, raw audio frame access in Python agent, PTT via data channel |
 | Agent runtime | LiveKit Agents (Python) | Browser-side AudioWorklet | Production-grade F0 via librosa, unified STT/TTS/analysis pipeline, numpy post-processing |
 | TTS provider | ElevenLabs (via LiveKit TTS plugin) | Web SpeechSynthesis only | Realistic ATC voice; fallback keeps prototype functional without API key |
-| ATC generation | Claude API (via Supabase Edge Function) | Pre-scripted responses | Natural variation per drill run; Edge Function keeps API key server-side |
+| ATC generation | OpenAI API (gpt-4o-mini via Supabase Edge Function) | Pre-scripted responses | Natural variation per drill run; Edge Function keeps API key server-side |
 | State management | Zustand | Redux / React Context | Surgical re-renders needed; minimal boilerplate; no provider nesting |
 | Backend | Supabase (Postgres + Edge Functions) | Express + SQLite | Managed DB, auto REST API, Edge Functions for secrets, zero server ops |
 | Charts | shadcn/ui Charts (Recharts) | Tremor / raw Recharts | Radar chart support (Tremor lacks it), CSS variable theming, copy-paste ownership |

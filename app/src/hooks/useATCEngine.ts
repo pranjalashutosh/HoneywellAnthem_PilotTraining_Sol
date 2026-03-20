@@ -58,23 +58,34 @@ export function useATCEngine() {
       const drill = scenario.activeDrill;
 
       if (!drill) {
-        console.warn('[useATCEngine] No active drill');
+        console.warn('[useATCEngine] No active drill — cannot speak ATC');
         return null;
       }
 
+      console.info('[useATCEngine] speakATCInstruction called — drill=%s, prompt="%s"',
+        drill.id, prompt.slice(0, 80));
+
       // Update keywords if provided
       if (keywords && keywords.length > 0) {
+        console.info('[useATCEngine] Updating drill keywords: %d terms', keywords.length);
         updateDrillKeywords(keywords);
       }
 
       // Build ATC context from current state
-      const context = buildContext(drill, prompt);
+      let context: ATCContext;
+      try {
+        context = buildContext(drill, prompt);
+      } catch (err) {
+        console.error('[useATCEngine] Failed to build ATC context:', err);
+        return null;
+      }
 
       // Mark ATC as speaking with safety timeout
       setATCSpeaking(true);
+      console.info('[useATCEngine] ATC speaking = true, starting generation');
       const timeoutId = setTimeout(() => {
         if (useVoiceStore.getState().isATCSpeaking) {
-          console.warn('[useATCEngine] ATC speaking timeout — resetting');
+          console.warn('[useATCEngine] ATC speaking timeout (30s) — force resetting');
           setATCSpeaking(false);
         }
       }, 30_000);
@@ -83,10 +94,14 @@ export function useATCEngine() {
       const instruction = await generateAndSpeakATCInstruction(context);
 
       if (!instruction) {
+        console.warn('[useATCEngine] generateAndSpeakATCInstruction returned null');
         clearTimeout(timeoutId);
         setATCSpeaking(false);
         return null;
       }
+
+      console.info('[useATCEngine] ATC instruction sent to agent — text: "%s"',
+        instruction.instruction.slice(0, 80));
 
       // Add ATC transcript entry
       const atcEntry: TranscriptEntry = {
