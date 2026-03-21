@@ -1,6 +1,6 @@
 // T1.1 — Cockpit domain types
 
-export type CockpitMode = 'NAV' | 'APR' | 'HDG' | 'ALT' | 'VS';
+export type CockpitMode = 'NAV' | 'APR' | 'HDG' | 'ALT' | 'VS' | 'VNAV' | 'FLCH';
 
 export interface Waypoint {
   id: string;
@@ -40,6 +40,10 @@ export interface CockpitState {
   altitude: number;
   heading: number;
   speed: number;
+  desiredAltitude?: number;
+  vnavConstraint?: number;
+  autopilot?: boolean;
+  autoThrottle?: boolean;
 }
 
 // Anthem Telemetry Abstraction (Strategic Dimension 1)

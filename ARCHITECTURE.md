@@ -141,7 +141,9 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   ├── useATCEngine.ts     # ATC generation + streaming response
 │       │   ├── useDrillRunner.ts   # Drill lifecycle orchestration
 │       │   ├── useTimer.ts         # Countdown / elapsed timer
-│       │   └── useAudioLevel.ts   # Real-time mic RMS via Web Audio API (ref-based, no re-renders)
+│       │   ├── useAudioLevel.ts   # Real-time mic RMS via Web Audio API (ref-based, no re-renders)
+│       │   ├── useAltitudeSimulation.ts  # Mode-dependent altitude animation (VNAV/FLCH/VS rates)
+│       │   └── useInteractiveCockpitTracker.ts  # Action tracking, condition evaluation, escalation timer
 │       ├── components/
 │       │   ├── layout/
 │       │   │   ├── CockpitShell.tsx
@@ -153,6 +155,13 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   │   ├── WaypointRow.tsx
 │       │   │   ├── WaypointEditor.tsx
 │       │   │   └── FrequencyTuner.tsx
+│       │   ├── cockpit/
+│       │   │   ├── AmbientCockpitView.tsx   # Default cockpit tab (no drill tracking)
+│       │   │   ├── InteractiveCockpitView.tsx  # Drill-tracked: overrides, tracking, composition
+│       │   │   ├── InteractivePFD.tsx   # PFD: synthetic vision, tapes, annunciations
+│       │   │   ├── InteractiveMFD.tsx   # MFD: 6 tabs + Training Metrics
+│       │   │   ├── AutopilotControlBar.tsx  # Mode buttons, AP/AUTO toggles
+│       │   │   └── ATCCommunicationOverlay.tsx  # ATC transcript + escalation
 │       │   ├── controls/
 │       │   │   ├── ModeSelectionBar.tsx
 │       │   │   ├── TouchNumpad.tsx
@@ -166,8 +175,9 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   │   ├── VoiceStatus.tsx
 │       │   │   └── VUMeter.tsx          # 16-segment horizontal VU bar (green/amber/red)
 │       │   ├── drill/
-│       │   │   ├── DrillSelector.tsx
-│       │   │   ├── DrillCard.tsx
+│       │   │   ├── DrillDropdownSelector.tsx  # Dropdown drill picker + detail panel
+│       │   │   ├── DrillSelector.tsx     # (Legacy) card grid
+│       │   │   ├── DrillCard.tsx          # (Legacy) individual card
 │       │   │   ├── DrillBriefing.tsx
 │       │   │   ├── DrillTimer.tsx
 │       │   │   ├── DrillActiveView.tsx   # Core drill execution UI
@@ -553,7 +563,8 @@ type DrillEvent =
   | ATCInstructionEvent
   | DecisionPointEvent
   | PredictSuggestionEvent
-  | CockpitActionEvent;
+  | CockpitActionEvent
+  | InteractiveCockpitEvent;
 
 interface ATCInstructionEvent {
   type: 'atc_instruction';
@@ -583,69 +594,129 @@ interface CockpitActionEvent {
   expectedAction: CockpitAction; // The correct touch action
   timeLimitSeconds: number;
 }
+
+interface InteractiveCockpitEvent {
+  type: 'interactive_cockpit';
+  description: string;                        // Situation context shown to pilot
+  initialCockpitOverrides: Partial<CockpitState>; // State applied on mount
+  successConditions: CockpitSuccessCondition[];   // All must be met to pass
+  timeLimitSeconds: number;                   // Max time before auto-fail (60s typical)
+  escalationPrompt?: string;                  // ATC escalation if pilot is slow
+  escalationDelaySeconds?: number;            // Delay before escalation fires (30s typical)
+}
+
+interface CockpitSuccessCondition {
+  field: keyof CockpitState;                  // e.g., 'selectedMode', 'desiredAltitude'
+  operator: 'eq' | 'lte' | 'gte' | 'neq' | 'in';
+  value: number | string | string[];
+  label: string;                              // Human-readable description
+}
+
+interface InteractiveCockpitScore {
+  conditionsMet: string[];        // Labels of conditions satisfied
+  allConditionsMet: boolean;
+  totalTimeMs: number;
+  timedOut: boolean;
+  modeChanges: { mode: string; timeMs: number }[];
+  altitudeChanges: { altitude: number; timeMs: number }[];
+  escalationTriggered: boolean;
+}
 ```
 
-### Example Drill: Descent with Traffic Conflict
+### Example Drill: VNAV Descent Conflict
+
+A unified 4-event scenario where a pilot at 14,000ft in VNAV mode has an 11,000ft VNAV constraint blocking descent to 8,000ft. Pilot must recognize the constraint, decide to override, confirm with ATC, then physically switch modes and set altitude on the interactive cockpit.
 
 ```typescript
 const descentConflict: DrillDefinition = {
   id: 'descent-conflict',
-  title: 'Descent with Traffic Conflict',
-  description: 'ATC clears descent to FL240 while TCAS shows traffic at FL340. ' +
-    'Tests situational awareness, problem solving, and communication.',
-  duration: 240,
+  title: 'VNAV Descent Conflict',
+  description: 'VNAV constraint blocks ATC-cleared descent to 8,000ft. ' +
+    'Tests mode awareness, knowledge, communication, and flight path management.',
+  duration: 300,
   difficulty: 'intermediate',
-  competencies: ['SAW', 'PSD', 'COM'],
-  flightPlan: 'kjfk-kbos',
+  competencies: ['COM', 'SAW', 'KNO', 'PSD', 'FPM'],
+  flightPlan: 'kteb-kpbi',
   initialState: {
-    altitude: 36000,
-    heading: 045,
-    speed: 280,
-    activeFrequency: { value: 124.35, label: 'Boston Center' },
-    selectedMode: 'NAV',
+    altitude: 14000, heading: 234, speed: 157,
+    selectedMode: 'VNAV',
+    desiredAltitude: 14000,
+    vnavConstraint: 11000,
+    activeFrequency: { value: 119.1, label: 'JAX Center' },
   },
   events: [
+    // Event 1: ATC voice instruction — "Descend and maintain 8,000"
+    { type: 'atc_instruction', ... },
+    // Event 2: Decision — recognize VNAV constraint, choose FLCH/VS override
+    { type: 'decision_point', timeLimitSeconds: 20, ... },
+    // Event 3: ATC confirmation — "Confirm you are descending to 8,000"
+    { type: 'atc_instruction', ... },
+    // Event 4: Interactive cockpit — pilot operates PFD/MFD to execute descent
     {
-      type: 'atc_instruction',
-      prompt: 'Clear the aircraft to descend and maintain FL240. ' +
-        'There is traffic at FL340 that the pilot should be aware of.',
-      expectedActions: [
-        { type: 'set_altitude', value: 24000 },
+      type: 'interactive_cockpit',
+      description: 'Execute the mode change and set altitude to 8,000 feet',
+      initialCockpitOverrides: {
+        altitude: 14000, selectedMode: 'VNAV',
+        desiredAltitude: 14000, vnavConstraint: 11000,
+      },
+      successConditions: [
+        { field: 'selectedMode', operator: 'in', value: ['FLCH', 'VS'],
+          label: 'Switch from VNAV to FLCH or VS mode' },
+        { field: 'desiredAltitude', operator: 'eq', value: 8000,
+          label: 'Set altitude to 8,000 feet' },
       ],
-      keywords: ['flight level two four zero', 'FL240', 'traffic'],
-    },
-    {
-      type: 'decision_point',
-      prompt: 'TCAS shows traffic at FL340, 12nm ahead, same track. ' +
-        'ATC has cleared you to FL240. What do you do?',
-      options: [
-        { id: 'a', text: 'Begin descent immediately as cleared' },
-        { id: 'b', text: 'Query ATC about traffic before descending' },
-        { id: 'c', text: 'Ignore ATC clearance and maintain FL360' },
-        { id: 'd', text: 'Request a lateral offset to avoid traffic' },
-      ],
-      correctOptionId: 'b',
-      timeLimitSeconds: 20,
-    },
-    {
-      type: 'atc_instruction',
-      prompt: 'Confirm traffic is no factor and re-clear the descent to FL240.',
-      expectedActions: [
-        { type: 'set_altitude', value: 24000 },
-        { type: 'set_mode', value: 'VS' },
-      ],
-      keywords: ['traffic no factor', 'FL240'],
+      timeLimitSeconds: 60,
+      escalationPrompt: 'Expedite your descent to 8,000, traffic below you.',
+      escalationDelaySeconds: 30,
     },
   ],
-  atcContext: {
-    facility: 'Boston Center',
-    sector: 'Sector 33',
-    callsign: 'November-one-two-three-four-alpha',
-    traffic: ['Delta 1492 at FL340, 12nm ahead, same track'],
-    weather: 'VMC, clear skies, winds 270/35',
-  },
+  atcContext: { ... },
 };
 ```
+
+---
+
+## Interactive Cockpit Subsystem
+
+When a drill contains an `interactive_cockpit` event, the system renders a 2-panel flight deck UI adapted from the Honeywell Anthem cockpit. The pilot physically operates mode buttons and altitude controls on an interactive PFD + MFD, while the system tracks every action and evaluates success conditions.
+
+### Component Architecture
+
+```
+InteractiveCockpitView (top-level container)
+├── AutopilotControlBar           — FLCH/VNAV/ALT/VS mode buttons + AP/AUTO toggles + altitude display
+├── InteractivePFD (left, ~70%)   — Synthetic vision, altitude/speed/heading tapes, mode annunciations
+├── InteractiveMFD (right, ~30%)  — 6 tabs (Home, Audio, Flight Plan, Checklists, Synoptics, Messages) + Training Metrics
+└── ATCCommunicationOverlay       — Floating ATC transcript panel with escalation messages
+```
+
+### Data Flow
+
+1. **On mount:** `InteractiveCockpitView` applies `initialCockpitOverrides` to `cockpit-store` (once, via ref guard)
+2. **Altitude simulation:** `useAltitudeSimulation` runs a 500ms interval, moving `altitude` toward `desiredAltitude` at mode-dependent rates:
+   - VNAV: 100ft/tick (respects `vnavConstraint` — won't descend below constraint altitude)
+   - FLCH: 200ft/tick (overrides constraint)
+   - VS: 150ft/tick (overrides constraint)
+3. **Action tracking:** `useInteractiveCockpitTracker` subscribes to cockpit-store, records mode/altitude changes with timestamps, evaluates `CockpitSuccessCondition`s on every change
+4. **Escalation:** If pilot hasn't met all conditions within `escalationDelaySeconds`, an ATC escalation message fires
+5. **Completion:** When all conditions met OR `timeLimitSeconds` expires → produces `InteractiveCockpitScore` → recorded to `assessment-store`
+
+### CockpitState Extensions
+
+Fields added for interactive cockpit support:
+- `desiredAltitude: number` — Target altitude set by pilot (MCP altitude window)
+- `vnavConstraint: number` — VNAV altitude floor (blocks descent in VNAV mode)
+- `autopilot: boolean` — AP engaged/disengaged
+- `autoThrottle: boolean` — Auto-throttle engaged/disengaged
+- `CockpitMode` union extended with `'VNAV' | 'FLCH'`
+
+### Scoring Integration
+
+`InteractiveCockpitScore` feeds into FPM (Flight Path Management) CBTA competency:
+- Conditions met percentage → base score
+- Time penalty: >30s average → -10 points
+- Escalation penalty: -5 points if escalation triggered
+- When both `touchScores` and `interactiveCockpitScores` exist: 40% touch + 60% interactive
 
 ---
 
@@ -1131,34 +1202,26 @@ App
 ├── StatusBar (clock, active freq, drill status)
 │
 ├── [tab: cockpit]
-│   └── CockpitShell
-│       ├── ModeSelectionBar
-│       ├── [panel: flight-plan]
-│       │   └── FlightPlanPanel
-│       │       ├── WaypointRow (×N)
-│       │       └── WaypointEditor (inline)
-│       ├── [panel: radios]
-│       │   └── RadiosPanel
-│       │       └── FrequencyTuner
-│       ├── PilotPredict
-│       │   └── PredictSuggestion (×N)
-│       ├── VoicePanel
-│       │   ├── TranscriptDisplay
-│       │   ├── PTTButton
-│       │   ├── VoiceStatus
-│       │   └── VUMeter (16-segment bar, ref-driven animation)
-│       └── TouchNumpad (overlay, conditional)
+│   └── AmbientCockpitView (default landing — interactive flight deck)
+│       ├── AutopilotControlBar (FLCH/VNAV/ALT/VS/AP/AUTO + altitude)
+│       ├── InteractivePFD (synthetic vision, altitude/speed/heading tapes)
+│       ├── InteractiveMFD (6 tabs + Training Metrics, ambient mode)
+│       └── ATCCommunicationOverlay (ATC transcripts)
 │
 ├── [tab: drills]
 │   └── DrillsTab
 │       ├── CalibrationView (shown before first drill if no baseline)
 │       │   └── VUMeter (real-time mic level, useAudioLevel hook)
-│       ├── DrillSelector
-│       │   └── DrillCard (×6)
+│       ├── DrillDropdownSelector (dropdown + detail panel + start button)
 │       ├── DrillBriefing (when drill selected)
 │       ├── DrillActiveView (during active drill)
 │       │   ├── DrillTimer
-│       │   └── DecisionPrompt (modal, conditional)
+│       │   ├── DecisionPrompt (modal, conditional)
+│       │   └── InteractiveCockpitView (for interactive_cockpit events)
+│       │       ├── AutopilotControlBar
+│       │       ├── InteractivePFD (synthetic vision, tapes, annunciations)
+│       │       ├── InteractiveMFD (6 tabs + Training Metrics)
+│       │       └── ATCCommunicationOverlay
 │       └── DrillOutcome (when drill complete)
 │
 └── [tab: assessment]

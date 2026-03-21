@@ -5,7 +5,7 @@ import { useCockpitStore } from '@/stores/cockpit-store';
 import { useAssessmentStore } from '@/stores/assessment-store';
 import { useVoiceStore } from '@/stores/voice-store';
 import { finalizeDrillAssessment } from '@/services/assessment-engine';
-import type { DrillDefinition, EventResult, DecisionScore, TrapScore, TouchScore } from '@/types';
+import type { DrillDefinition, EventResult, DecisionScore, TrapScore, TouchScore, InteractiveCockpitScore } from '@/types';
 import { allDrills } from '@/data/drills';
 
 export function initializeDrills(): void {
@@ -30,6 +30,22 @@ export function startDrill(drillId: string): void {
   cockpit.setFrequency(drill.initialState.activeFrequency, 'active');
   cockpit.setFrequency(drill.initialState.standbyFrequency, 'standby');
   cockpit.setMode(drill.initialState.selectedMode);
+
+  // Set extended cockpit state fields if provided
+  if (drill.initialState.desiredAltitude !== undefined) {
+    cockpit.setDesiredAltitude(drill.initialState.desiredAltitude);
+  } else {
+    cockpit.setDesiredAltitude(drill.initialState.altitude);
+  }
+  if (drill.initialState.vnavConstraint !== undefined) {
+    cockpit.setVnavConstraint(drill.initialState.vnavConstraint);
+  }
+  if (drill.initialState.autopilot !== undefined) {
+    cockpit.setAutopilot(drill.initialState.autopilot);
+  }
+  if (drill.initialState.autoThrottle !== undefined) {
+    cockpit.setAutoThrottle(drill.initialState.autoThrottle);
+  }
 
   // Initialize assessment metrics
   assessment.initDrillMetrics(drill.id);
@@ -88,6 +104,22 @@ export function recordEventResult(result: EventResult): void {
         expectedAction: (result.details.expectedAction as string) ?? '',
       };
       assessment.recordTouchScore(touchScore);
+      break;
+    }
+
+    case 'interactive_cockpit': {
+      // Score is already recorded by InteractiveCockpitView via assessment store
+      // This case handles the EventResult routing for completeness
+      const interactiveScore: InteractiveCockpitScore = {
+        conditionsMet: (result.details.conditionsMet as InteractiveCockpitScore['conditionsMet']) ?? [],
+        allConditionsMet: result.success,
+        totalTimeMs: (result.details.totalTimeMs as number) ?? 0,
+        timedOut: (result.details.timedOut as boolean) ?? false,
+        modeChanges: (result.details.modeChanges as InteractiveCockpitScore['modeChanges']) ?? [],
+        altitudeChanges: (result.details.altitudeChanges as InteractiveCockpitScore['altitudeChanges']) ?? [],
+        escalationTriggered: (result.details.escalationTriggered as boolean) ?? false,
+      };
+      assessment.recordInteractiveCockpitScore(interactiveScore);
       break;
     }
 

@@ -1,7 +1,7 @@
 // T2.8 — Tab-based routing using ui-store.activeTab
 
 import { TopNavBar } from '@/components/layout/TopNavBar';
-import { CockpitShell } from '@/components/layout/CockpitShell';
+import { AmbientCockpitView } from '@/components/cockpit/AmbientCockpitView';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { DrillsTab } from '@/components/drill/DrillsTab';
 import { AssessmentDashboard } from '@/components/assessment/AssessmentDashboard';
@@ -18,7 +18,7 @@ export function App() {
     <div className="flex flex-col h-screen bg-anthem-bg-primary text-anthem-text-primary font-sans">
       <TopNavBar />
       <main className="flex-1 flex flex-col overflow-hidden">
-        {activeTab === 'cockpit' && <CockpitShell />}
+        {activeTab === 'cockpit' && <AmbientCockpitView />}
         {activeTab === 'drills' && <DrillsTab />}
         {activeTab === 'assessment' && <AssessmentDashboard />}
       </main>

@@ -39,7 +39,7 @@ Every file in the project, grouped by feature pipeline.
 ## 2. Drill System (Definitions, Runner, UI)
 
 ### Drill Definitions
-- `app/src/data/drills/descent-conflict.ts` — Descent clearance conflict with incorrect altitude suggestion trap
+- `app/src/data/drills/descent-conflict.ts` — VNAV descent conflict: 4-event unified scenario (voice readback, decision, confirmation, interactive cockpit)
 - `app/src/data/drills/predict-wrong-freq.ts` — PilotPredict suggests wrong frequency to test automation resistance
 - `app/src/data/drills/weather-diversion.ts` — Unexpected weather requiring go-around decision
 - `app/src/data/drills/runway-change.ts` — Last-minute runway change during approach
@@ -48,8 +48,9 @@ Every file in the project, grouped by feature pipeline.
 - `app/src/data/drills/index.ts` — Drill registry exporting all drills as `allDrills`
 
 ### Drill UI Components
-- `app/src/components/drill/DrillSelector.tsx` — Grid of available drills with difficulty/competency tags
-- `app/src/components/drill/DrillCard.tsx` — Individual drill card: title, description, duration, start button
+- `app/src/components/drill/DrillDropdownSelector.tsx` — Dropdown drill picker with detail panel, event list, and start button
+- `app/src/components/drill/DrillSelector.tsx` — (Legacy) Grid of available drills with difficulty/competency tags
+- `app/src/components/drill/DrillCard.tsx` — (Legacy) Individual drill card: title, description, duration, start button
 - `app/src/components/drill/DrillBriefing.tsx` — Pre-drill briefing with scenario overview and objectives
 - `app/src/components/drill/DrillActiveView.tsx` — Live drill: event rendering, voice panel, decision prompts, cockpit actions
 - `app/src/components/drill/DecisionPrompt.tsx` — Decision point display with pilot options
@@ -91,38 +92,48 @@ Every file in the project, grouped by feature pipeline.
 
 ## 5. Cockpit UI (Panels, Controls)
 
-### Panels
-- `app/src/components/panels/FlightPlanPanel.tsx` — Scrollable waypoint list with active/inactive highlighting
-- `app/src/components/panels/RadiosPanel.tsx` — Active/standby frequency display with swap and editing
-- `app/src/components/panels/WaypointEditor.tsx` — Edit single waypoint details
-- `app/src/components/panels/WaypointRow.tsx` — Individual waypoint row in flight plan
-- `app/src/components/panels/FrequencyTuner.tsx` — Frequency selector with 0.025 MHz stepping and numpad entry
+### Panels (Legacy — superseded by InteractiveMFD tabs)
+- `app/src/components/panels/FlightPlanPanel.tsx` — (Legacy) Scrollable waypoint list with active/inactive highlighting
+- `app/src/components/panels/RadiosPanel.tsx` — (Legacy) Active/standby frequency display with swap and editing
+- `app/src/components/panels/WaypointEditor.tsx` — (Legacy) Edit single waypoint details
+- `app/src/components/panels/WaypointRow.tsx` — (Legacy) Individual waypoint row in flight plan
+- `app/src/components/panels/FrequencyTuner.tsx` — (Legacy) Frequency selector with 0.025 MHz stepping and numpad entry
+
+### Interactive Cockpit (2-Panel Flight Deck)
+- `app/src/components/cockpit/AmbientCockpitView.tsx` — Default cockpit tab landing page: composes PFD + MFD + control bar without drill tracking (ambient/free mode)
+- `app/src/components/cockpit/InteractiveCockpitView.tsx` — Drill-tracked interactive cockpit: composes AutopilotControlBar + PFD + MFD + ATC overlay, applies cockpit overrides, tracks success conditions
+- `app/src/components/cockpit/InteractivePFD.tsx` — Primary Flight Display: synthetic vision, altitude/speed/heading tapes, mode annunciations, flight path marker, VNAV constraint warning
+- `app/src/components/cockpit/InteractiveMFD.tsx` — Multi-Function Display: 6 tabs (Home, Audio, Flight Plan, Checklists, Synoptics, Messages) + Training Metrics panel
+- `app/src/components/cockpit/AutopilotControlBar.tsx` — Autopilot mode buttons (FLCH, VNAV, ALT, V/S, AP, AUTO) + altitude/frequency display, writes to cockpit-store
+- `app/src/components/cockpit/ATCCommunicationOverlay.tsx` — Floating ATC transcript panel with escalation message display
+- `app/src/hooks/useAltitudeSimulation.ts` — Interval-based altitude animation: mode-dependent descent rates, VNAV respects constraint floor, FLCH/VS override it
+- `app/src/hooks/useInteractiveCockpitTracker.ts` — Cockpit action tracker: subscribes to store changes, evaluates CockpitSuccessConditions, manages escalation timer, computes InteractiveCockpitScore
 
 ### Controls
-- `app/src/components/controls/ModeSelectionBar.tsx` — Autopilot mode selector (APD, FD, ALT HOLD, etc.)
+- `app/src/components/controls/ModeSelectionBar.tsx` — (Legacy) Autopilot mode selector; replaced by AutopilotControlBar
 - `app/src/components/controls/TouchNumpad.tsx` — 10-digit touchpad for frequency/altitude entry
 - `app/src/components/controls/TouchKeyboard.tsx` — On-screen QWERTY keyboard for callsign/waypoint input
 - `app/src/components/controls/PilotPredict.tsx` — AI suggestion container with accept/reject gesture targets
 - `app/src/components/controls/PredictSuggestion.tsx` — Individual AI suggestion display (correct or trap)
 
 ### Cockpit State
-- `app/src/stores/cockpit-store.ts` — Flight plan, frequencies, altitude, heading, speed, autopilot mode, selected waypoint
+- `app/src/stores/cockpit-store.ts` — Flight plan, frequencies, altitude, heading, speed, autopilot mode, selected waypoint, desiredAltitude, vnavConstraint, autopilot/autoThrottle state
 
 ---
 
 ## 6. Layout & Navigation
 
-- `app/src/components/layout/TopNavBar.tsx` — Header: drill title, elapsed time, phase indicator
-- `app/src/components/layout/CockpitShell.tsx` — Main layout: TopNavBar, tabbed panel area, status bar
-- `app/src/components/layout/StatusBar.tsx` — Footer: connection status, altitude, heading, speed, frequency
+- `app/src/components/layout/TopNavBar.tsx` — Header: tab switcher (Cockpit, Drills, Assessment), pilot selector
+- `app/src/components/layout/CockpitShell.tsx` — (Legacy) Old cockpit layout with FlightPlan/Radios panels; replaced by AmbientCockpitView
+- `app/src/components/layout/StatusBar.tsx` — Footer: UTC clock, frequency, active drill name with green indicator, LiveKit connection, degradation badges
 
 ---
 
 ## 7. State Management (Zustand Stores)
 
-- `app/src/stores/cockpit-store.ts` — Flight plan, frequencies, altitude, heading, speed, autopilot mode
+- `app/src/stores/cockpit-store.ts` — Flight plan, frequencies, altitude, heading, speed, autopilot mode, desiredAltitude, vnavConstraint, autopilot/autoThrottle
 - `app/src/stores/scenario-store.ts` — Drill phase, active drill, current event, event results, drill history
-- `app/src/stores/assessment-store.ts` — Drill metrics, CBTA scores, cognitive load baselines, Supabase sync
+- `app/src/stores/assessment-store.ts` — Drill metrics, CBTA scores, cognitive load baselines, interactive cockpit scores, Supabase sync
 - `app/src/stores/voice-store.ts` — PTT, transcript history, LiveKit connection, ATC speaking
 - `app/src/stores/pilot-store.ts` — Selected pilot profile, experience level, accent group
 - `app/src/stores/ui-store.ts` — Active tab, sidebar visibility, UI preferences
@@ -162,16 +173,16 @@ Every file in the project, grouped by feature pipeline.
 
 ### App Entry
 - `app/src/main.tsx` — React app entry point, root component mount
-- `app/src/App.tsx` — Main app: tab routing (drills, assessment), useLiveKit() mount
+- `app/src/App.tsx` — Main app: tab routing (cockpit→AmbientCockpitView, drills, assessment), useLiveKit() mount
 
 ---
 
 ## 10. Types (TypeScript Domain Models)
 
 - `app/src/types/index.ts` — Barrel export of all types
-- `app/src/types/cockpit.ts` — FlightPlan, Waypoint, Frequency, AutopilotMode, CockpitState
-- `app/src/types/scenario.ts` — DrillDefinition, Event, EventResult, DecisionOption, Trap
-- `app/src/types/assessment.ts` — DrillMetrics, CBTAScores, ReadbackScore, DecisionScore, TrapScore, TouchScore
+- `app/src/types/cockpit.ts` — FlightPlan, Waypoint, Frequency, CockpitMode (incl. VNAV/FLCH), CockpitState (incl. desiredAltitude, vnavConstraint, autopilot, autoThrottle)
+- `app/src/types/scenario.ts` — DrillDefinition, Event, EventResult, DecisionOption, Trap, InteractiveCockpitEvent, CockpitSuccessCondition
+- `app/src/types/assessment.ts` — DrillMetrics, CBTAScores, ReadbackScore, DecisionScore, TrapScore, TouchScore, InteractiveCockpitScore
 - `app/src/types/voice.ts` — TranscriptEntry, ConfidenceAnnotatedWord, VoiceMetrics
 - `app/src/types/cognitive-load.ts` — CognitiveLoadBaseline, CognitiveLoadScore, VoiceBiomarkers
 - `app/src/types/latency.ts` — LatencyDecomposition, ResponseLatency

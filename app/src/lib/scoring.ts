@@ -132,10 +132,34 @@ function computePSD(m: DrillMetrics): number {
 }
 
 function computeFPM(m: DrillMetrics): number {
-  if (m.touchScores.length === 0) return 50;
-  return clamp(
-    (m.touchScores.filter((t) => t.actionCorrect).length / m.touchScores.length) * 100,
-  );
+  let touchPct = 50;
+  if (m.touchScores.length > 0) {
+    touchPct =
+      (m.touchScores.filter((t) => t.actionCorrect).length / m.touchScores.length) * 100;
+  }
+
+  let interactivePct = 50;
+  if (m.interactiveCockpitScores.length > 0) {
+    const met = m.interactiveCockpitScores.filter((s) => s.allConditionsMet).length;
+    interactivePct = (met / m.interactiveCockpitScores.length) * 100;
+
+    // Time penalty: slow responses reduce score
+    const avgTime = avg(m.interactiveCockpitScores.map((s) => s.totalTimeMs));
+    if (avgTime > 30000) interactivePct -= 10;
+
+    // Escalation penalty
+    if (m.interactiveCockpitScores.some((s) => s.escalationTriggered)) {
+      interactivePct -= 5;
+    }
+  }
+
+  // Use whichever data is available; prefer interactive if both exist
+  if (m.touchScores.length > 0 && m.interactiveCockpitScores.length > 0) {
+    return clamp(touchPct * 0.4 + interactivePct * 0.6);
+  }
+  if (m.interactiveCockpitScores.length > 0) return clamp(interactivePct);
+  if (m.touchScores.length > 0) return clamp(touchPct);
+  return 50;
 }
 
 // ─── Exponential Decay Rolling Average ───────────────────────
@@ -252,6 +276,15 @@ export function computeOverallScore(metrics: DrillMetrics): number {
         metrics.touchScores.length) *
       100;
     total += correctPct * 0.15;
+    weight += 0.15;
+  }
+
+  if (metrics.interactiveCockpitScores.length > 0) {
+    const metPct =
+      (metrics.interactiveCockpitScores.filter((s) => s.allConditionsMet).length /
+        metrics.interactiveCockpitScores.length) *
+      100;
+    total += metPct * 0.15;
     weight += 0.15;
   }
 

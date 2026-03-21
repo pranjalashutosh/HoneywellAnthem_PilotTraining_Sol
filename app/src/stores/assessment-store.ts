@@ -9,6 +9,7 @@ import type {
   DecisionScore,
   TrapScore,
   TouchScore,
+  InteractiveCockpitScore,
   CognitiveLoadBaseline,
   CognitiveLoadScore,
 } from '@/types';
@@ -29,6 +30,7 @@ interface AssessmentStore {
   recordDecisionScore: (score: DecisionScore) => void;
   recordTrapScore: (score: TrapScore) => void;
   recordTouchScore: (score: TouchScore) => void;
+  recordInteractiveCockpitScore: (score: InteractiveCockpitScore) => void;
   initDrillMetrics: (drillId: string) => void;
   finalizeDrillMetrics: () => void;
   setCBTA: (scores: CBTAScores) => void;
@@ -69,6 +71,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
         decisionScores: [],
         trapScores: [],
         touchScores: [],
+        interactiveCockpitScores: [],
         cognitiveLoadScores: [],
         overallScore: 0,
         completedAt: 0,
@@ -137,6 +140,20 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
         currentDrillMetrics: {
           ...state.currentDrillMetrics,
           touchScores: [...state.currentDrillMetrics.touchScores, score],
+        },
+      };
+    }),
+
+  recordInteractiveCockpitScore: (score) =>
+    set((state) => {
+      if (!state.currentDrillMetrics) return state;
+      return {
+        currentDrillMetrics: {
+          ...state.currentDrillMetrics,
+          interactiveCockpitScores: [
+            ...state.currentDrillMetrics.interactiveCockpitScores,
+            score,
+          ],
         },
       };
     }),

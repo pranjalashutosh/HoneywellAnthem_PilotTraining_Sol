@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useDrillRunner } from '@/hooks/useDrillRunner';
 import { usePilotStore } from '@/stores/pilot-store';
 import { useAssessmentStore } from '@/stores/assessment-store';
-import { DrillSelector } from './DrillSelector';
+import { DrillDropdownSelector } from './DrillDropdownSelector';
 import { DrillBriefing } from './DrillBriefing';
 import { DrillActiveView } from './DrillActiveView';
 import { DrillOutcome } from './DrillOutcome';
@@ -27,7 +27,7 @@ export function DrillsTab() {
       if (needsCalibration) {
         return <CalibrationView onComplete={() => setCalibrationSkipped(true)} />;
       }
-      return <DrillSelector />;
+      return <DrillDropdownSelector />;
     case 'briefing':
       return <DrillBriefing />;
     case 'active':
@@ -36,6 +36,6 @@ export function DrillsTab() {
     case 'outcome':
       return <DrillOutcome />;
     default:
-      return <DrillSelector />;
+      return <DrillDropdownSelector />;
   }
 }

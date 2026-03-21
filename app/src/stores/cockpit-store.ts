@@ -11,6 +11,10 @@ interface CockpitStore {
   altitude: number;
   heading: number;
   speed: number;
+  desiredAltitude: number;
+  vnavConstraint: number;
+  autopilot: boolean;
+  autoThrottle: boolean;
 
   setFrequency: (freq: Frequency, slot: 'active' | 'standby') => void;
   swapFrequencies: () => void;
@@ -19,6 +23,11 @@ interface CockpitStore {
   setAltitude: (alt: number) => void;
   setHeading: (hdg: number) => void;
   setSpeed: (spd: number) => void;
+  setDesiredAltitude: (alt: number) => void;
+  adjustDesiredAltitude: (direction: 'up' | 'down', step?: number) => void;
+  setVnavConstraint: (alt: number) => void;
+  setAutopilot: (on: boolean) => void;
+  setAutoThrottle: (on: boolean) => void;
   loadFlightPlan: (plan: Waypoint[]) => void;
   reset: () => void;
 }
@@ -31,6 +40,10 @@ const defaultState = {
   altitude: 36000,
   heading: 360,
   speed: 280,
+  desiredAltitude: 36000,
+  vnavConstraint: 0,
+  autopilot: true,
+  autoThrottle: true,
 };
 
 export const useCockpitStore = create<CockpitStore>((set) => ({
@@ -59,6 +72,20 @@ export const useCockpitStore = create<CockpitStore>((set) => ({
   setHeading: (hdg) => set({ heading: hdg }),
 
   setSpeed: (spd) => set({ speed: spd }),
+
+  setDesiredAltitude: (alt) => set({ desiredAltitude: alt }),
+
+  adjustDesiredAltitude: (direction, step = 1000) =>
+    set((state) => {
+      const change = direction === 'up' ? step : -step;
+      return { desiredAltitude: Math.max(0, Math.min(50000, state.desiredAltitude + change)) };
+    }),
+
+  setVnavConstraint: (alt) => set({ vnavConstraint: alt }),
+
+  setAutopilot: (on) => set({ autopilot: on }),
+
+  setAutoThrottle: (on) => set({ autoThrottle: on }),
 
   loadFlightPlan: (plan) => set({ flightPlan: plan }),
 

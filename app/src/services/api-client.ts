@@ -173,6 +173,7 @@ export async function fetchDrillHistory(pilotId: string): Promise<DrillResult[]>
       decisionScores: rawMetrics.decisionScores ?? [],
       trapScores: rawMetrics.trapScores ?? [],
       touchScores: rawMetrics.touchScores ?? [],
+      interactiveCockpitScores: rawMetrics.interactiveCockpitScores ?? [],
       cognitiveLoadScores: rawMetrics.cognitiveLoadScores ?? [],
       overallScore: rawMetrics.overallScore ?? (row.overall_score as number),
       completedAt: rawMetrics.completedAt ?? new Date(row.completed_at as string).getTime(),

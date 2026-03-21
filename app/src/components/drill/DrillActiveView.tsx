@@ -8,7 +8,8 @@ import { evaluatePredictResponse } from '@/services/pilot-predict';
 import { VoicePanel } from '@/components/voice/VoicePanel';
 import { useVoiceStore } from '@/stores/voice-store';
 import { useATCEngine } from '@/hooks/useATCEngine';
-import type { DecisionPointEvent, PredictSuggestionEvent, ATCInstructionEvent } from '@/types';
+import type { DecisionPointEvent, PredictSuggestionEvent, ATCInstructionEvent, InteractiveCockpitEvent, InteractiveCockpitScore } from '@/types';
+import { InteractiveCockpitView } from '@/components/cockpit/InteractiveCockpitView';
 import { useState, useEffect, useRef } from 'react';
 
 export function DrillActiveView() {
@@ -254,6 +255,28 @@ export function DrillActiveView() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Interactive cockpit event — full PFD + MFD view
+  if (currentEvent.type === 'interactive_cockpit') {
+    const interactiveEvent = currentEvent as InteractiveCockpitEvent;
+    return (
+      <InteractiveCockpitView
+        event={interactiveEvent}
+        drill={activeDrill}
+        eventIndex={currentEventIndex}
+        totalEvents={totalEvents}
+        startTime={startTime}
+        onComplete={(score: InteractiveCockpitScore) => {
+          recordResult({
+            eventType: 'interactive_cockpit',
+            success: score.allConditionsMet,
+            details: score as unknown as Record<string, unknown>,
+          });
+          handleAdvanceOrComplete();
+        }}
+      />
     );
   }
 

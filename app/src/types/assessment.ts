@@ -54,12 +54,23 @@ export interface TouchScore {
   expectedAction: string;
 }
 
+export interface InteractiveCockpitScore {
+  conditionsMet: { label: string; met: boolean; timeMs: number }[];
+  allConditionsMet: boolean;
+  totalTimeMs: number;
+  timedOut: boolean;
+  modeChanges: { from: string; to: string; timeMs: number }[];
+  altitudeChanges: { from: number; to: number; timeMs: number }[];
+  escalationTriggered: boolean;
+}
+
 export interface DrillMetrics {
   drillId: string;
   readbackScores: ReadbackScore[];
   decisionScores: DecisionScore[];
   trapScores: TrapScore[];
   touchScores: TouchScore[];
+  interactiveCockpitScores: InteractiveCockpitScore[];
   cognitiveLoadScores: CognitiveLoadScore[];
   overallScore: number;
   completedAt: number;

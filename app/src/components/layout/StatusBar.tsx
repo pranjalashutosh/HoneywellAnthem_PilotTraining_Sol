@@ -54,10 +54,7 @@ export function StatusBar() {
   const hasLiveKitUrl = Boolean(import.meta.env.VITE_LIVEKIT_URL);
   const hasSupabase = isSupabaseConfigured();
 
-  const drillLabel =
-    drillPhase === 'idle'
-      ? 'No Active Drill'
-      : drillPhase.charAt(0).toUpperCase() + drillPhase.slice(1);
+  const activeDrill = useScenarioStore((s) => s.activeDrill);
 
   // Calibration status for active drills
   const showCalibration = drillPhase !== 'idle' && baseline;
@@ -97,15 +94,16 @@ export function StatusBar() {
 
         <span className="text-anthem-text-muted">|</span>
 
-        <span
-          className={
-            drillPhase === 'idle'
-              ? 'text-anthem-text-muted'
-              : 'text-anthem-amber'
-          }
-        >
-          {drillLabel}
-        </span>
+        {drillPhase !== 'idle' && activeDrill ? (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-anthem-green animate-pulse" />
+            <span className="text-anthem-green font-mono text-[10px]">
+              {activeDrill.title}
+            </span>
+          </span>
+        ) : (
+          <span className="text-anthem-text-muted">No Active Drill</span>
+        )}
         <span className="text-anthem-text-muted">|</span>
         <span className="flex items-center gap-1.5">
           <span

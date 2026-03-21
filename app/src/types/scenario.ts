@@ -43,11 +43,29 @@ export interface CockpitActionEvent {
   timeLimitSeconds: number;
 }
 
+export interface CockpitSuccessCondition {
+  field: 'selectedMode' | 'desiredAltitude' | 'altitude' | 'heading' | 'speed' | 'activeFrequency';
+  operator: 'eq' | 'lte' | 'gte' | 'neq' | 'in';
+  value: number | string | string[];
+  label: string;
+}
+
+export interface InteractiveCockpitEvent {
+  type: 'interactive_cockpit';
+  description: string;
+  initialCockpitOverrides: Partial<CockpitState>;
+  successConditions: CockpitSuccessCondition[];
+  timeLimitSeconds: number;
+  escalationPrompt?: string;
+  escalationDelaySeconds?: number;
+}
+
 export type DrillEvent =
   | ATCInstructionEvent
   | DecisionPointEvent
   | PredictSuggestionEvent
-  | CockpitActionEvent;
+  | CockpitActionEvent
+  | InteractiveCockpitEvent;
 
 export interface DrillDefinition {
   id: string;
