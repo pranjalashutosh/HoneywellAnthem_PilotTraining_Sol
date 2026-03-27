@@ -10,6 +10,27 @@
       rel="stylesheet"
     />
     <title>Anthem Cockpit Trainer</title>
+    <!-- Suppress Google Maps native error dialog; handled by MapDisplay component -->
+    <script>
+      window.gm_authFailure = function() {};
+      (function() {
+        var observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(m) {
+            m.addedNodes.forEach(function(node) {
+              if (node.nodeType !== 1) return;
+              var el = node;
+              var z = parseInt(el.style && el.style.zIndex, 10);
+              if (z >= 1000000) { el.remove(); return; }
+              // also check inner divs Google injects
+              var inner = el.querySelectorAll && el.querySelectorAll('[style*="z-index: 1000000"], [style*="z-index:1000000"]');
+              if (inner && inner.length) inner.forEach(function(n) { n.remove(); });
+            });
+          });
+        });
+        function start() { observer.observe(document.body, { childList: true, subtree: true }); }
+        if (document.body) { start(); } else { document.addEventListener('DOMContentLoaded', start); }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

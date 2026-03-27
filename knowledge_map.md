@@ -69,6 +69,7 @@ Every file in the project, grouped by feature pipeline.
 ## 3. Assessment Engine (Scoring, CBTA, Cognitive Load)
 
 ### Assessment Logic
+- `app/src/lib/flight-plan-utils.ts` — Pure math utilities: haversineNm, bearingDeg, enrichWaypoints (computes distance/bearing/ETE/phase/passed), computeProgress (single source of truth → FlightPlanProgress), waypointTrainingAnnotation (inline training badges per waypoint), formatters (formatAltFp, formatEteFp, formatDistNm, formatBearingFp, formatRestriction), backward-compat helpers
 - `app/src/lib/scoring.ts` — CBTA competency scoring (COM/WLM/SAW/KNO/PSD/FPM), confidence-weighted readback accuracy, exponential decay rollup, WER estimation
 - `app/src/lib/frequency-utils.ts` — Frequency helpers: isFrequencyAction classifier, COM range validation, predictive frequency matching, expected-value comparison
 - `app/src/services/assessment-engine.ts` — Parses agent assessment results, computes DrillMetrics, rolls up CBTA with decay, writes to stores
@@ -106,7 +107,8 @@ Every file in the project, grouped by feature pipeline.
 - `app/src/components/cockpit/AmbientCockpitView.tsx` — Single persistent cockpit view: composes PFD + resizable MFD + control bar, phase-aware drill overlay rendering (excludes ATC and frequency cockpit_action events), auto-switches MFD to Radios tab for ATC and frequency cockpit_action events, swaps to InteractiveCockpitView for interactive_cockpit events
 - `app/src/components/cockpit/InteractiveCockpitView.tsx` — Drill-tracked interactive cockpit: composes AutopilotControlBar + PFD + MFD + ATC overlay, applies cockpit overrides, tracks success conditions
 - `app/src/components/cockpit/InteractivePFD.tsx` — Primary Flight Display: synthetic vision, altitude/speed/heading tapes, mode annunciations, flight path marker, VNAV constraint warning
-- `app/src/components/cockpit/InteractiveMFD.tsx` — Multi-Function Display: 6 tabs (Home, Radios, Flight Plan, Map, Checklists, Messages) + InlineFrequencyNumpad (replaces Training Status during drills) + embedded drill lifecycle in Home tab + pilot selector + drill-aware Radios tab with inline ATC communication and frequency cockpit_action handling
+- `app/src/components/cockpit/InteractiveMFD.tsx` — Multi-Function Display: 6 tabs (Home, Radios, Flight Plan, Map, Checklists, Messages); Flight Plan tab delegates to FlightPlanTab component
+- `app/src/components/cockpit/FlightPlanTab.tsx` — Avionics-style Flight Plan tab: route picker, summary card, ProgressCard (phase chip + active→next waypoint + dist-to-next + TOD cue, via computeProgress), ProceduresCard (Procedure objects with status badges + departure/arrival runways + runwayChange flag), WaypointLegs (LEG column, inline training annotation badges via waypointTrainingAnnotation), TrainingStatusCard (drill flags grid)
 - `app/src/components/cockpit/AutopilotControlBar.tsx` — Autopilot mode buttons (FLCH, VNAV, ALT, V/S, AP, AUTO) + altitude/frequency display, writes to cockpit-store
 - `app/src/components/cockpit/ATCCommunicationOverlay.tsx` — Floating ATC transcript panel with escalation message display
 - `app/src/components/cockpit/ResizeHandle.tsx` — Draggable vertical resize handle between PFD and MFD panels (mouse + touch)
@@ -123,6 +125,26 @@ Every file in the project, grouped by feature pipeline.
 
 ### Cockpit State
 - `app/src/stores/cockpit-store.ts` — Flight plan, frequencies, altitude, heading, speed, autopilot mode, selected waypoint, desiredAltitude, vnavConstraint, autopilot/autoThrottle state
+
+---
+
+## 5b. Map Display (Aviation Map Panel — MFD Map Tab)
+
+### Map Components
+- `app/src/components/map/MapDisplay.tsx` — Main orchestrator: APIProvider wrapper, MapCanvas with Google Maps, no-key placeholder with setup instructions
+- `app/src/components/map/AircraftMarker.tsx` — Heading-aware SVG aircraft silhouette + pulsing cyan halo via AdvancedMarker (imperative)
+- `app/src/components/map/RouteOverlay.tsx` — Flight route polyline (flown dim / ahead bright) + optional dashed alternate route + breadcrumb dot trail via imperative Maps API
+- `app/src/components/map/WaypointMarkers.tsx` — Themed diamond waypoint markers, airport ring markers (departure/destination/alternate colours), clickable MarkerInfoCard popup
+- `app/src/components/map/ScenarioOverlay.tsx` — Weather zones, holding regions, comms handoff areas, VNAV conflict zones as themed circles/polygons; OverlayInfoCard popup
+- `app/src/components/map/MapControls.tsx` — Floating avionics control bar: zoom +/−, recenter, layer toggles (RTE/APT/WPT/TRK/WX)
+- `app/src/components/map/MapInfoPanel.tsx` — Bottom status strip: callsign, heading, altitude, GS, next waypoint dist/bearing, ETE to destination, active scenario badge
+
+### Map Config & Data
+- `app/src/components/map/mapTheme.ts` — Dark avionics Google Maps style array (AVIONICS_MAP_STYLE), MAP_DEFAULT_OPTIONS, MAP_COLORS palette constants
+- `app/src/data/map-mock-data.ts` — Mock aircraft state, airports (KTEB/KPBI/KMIA), waypoints (from kteb-kpbi flight plan), scenario overlays (weather/vnav/comms/holding), breadcrumb trail
+
+### Map Types
+- `app/src/types/map.ts` — AircraftState, MapAirport, MapWaypoint, ScenarioOverlay, BreadcrumbPoint, MapLayerVisibility, SelectedMapFeature
 
 ---
 
@@ -151,8 +173,11 @@ Every file in the project, grouped by feature pipeline.
 - `app/src/data/frequencies.ts` — Nav aid frequencies (VOR, ILS, NDB) for major US airports
 - `app/src/data/waypoints.ts` — Named waypoints/intersections with coordinates and altitude restrictions
 - `app/src/data/phraseology.ts` — Standard ATC phraseology templates and pilot readback patterns
-- `app/src/data/flight-plans/kteb-kpbi.ts` — KTEB to KPBI flight plan with waypoints
-- `app/src/data/flight-plans/kjfk-kbos.ts` — KJFK to KBOS flight plan with waypoints
+- `app/src/data/flight-plans/kteb-kpbi.ts` — KTEB to KPBI flight plan as base Waypoint[] (cockpit-store compatible)
+- `app/src/data/flight-plans/kteb-kpbi-full.ts` — Full FlightPlanPackage for KTEB→KPBI: enriched waypoints + meta (Procedure objects for SID/STAR/APPR, departureRunway/arrivalRunway) + training context
+- `app/src/data/flight-plans/kjfk-kbos.ts` — KJFK to KBOS base Waypoint[] (cockpit-store compatible)
+- `app/src/data/flight-plans/kjfk-kbos-full.ts` — Full FlightPlanPackage for KJFK→KBOS: enriched waypoints + Procedure objects + departureRunway/arrivalRunway + training context
+- `app/src/data/flight-plans/route-registry.ts` — ROUTE_REGISTRY: maps route IDs to FlightPlanPackage, airports, aircraft position, map center/zoom, breadcrumbs; used by FlightPlanTab picker and MapDisplay
 
 ### API & Services
 - `app/src/services/api-client.ts` — Supabase CRUD: pilot profiles, drill results, cognitive load baselines, population analytics RPC
@@ -184,7 +209,8 @@ Every file in the project, grouped by feature pipeline.
 
 ## 10. Types (TypeScript Domain Models)
 
-- `app/src/types/index.ts` — Barrel export of all types
+- `app/src/types/index.ts` — Barrel export of all types (includes flight-plan types)
+- `app/src/types/flight-plan.ts` — RouteWaypointType, FlightPhase, ProcedureStatus, Procedure, AltitudeRestriction, EnrichedWaypoint (extends Waypoint), FlightPlanMeta (+ departureRunway/arrivalRunway + Procedure fields), FlightPlanProgress (single source of truth for all progress math), FlightPlanTrainingContext, FlightPlanPackage
 - `app/src/types/cockpit.ts` — FlightPlan, Waypoint, Frequency, CockpitMode (incl. VNAV/FLCH), CockpitState (incl. desiredAltitude, vnavConstraint, autopilot, autoThrottle)
 - `app/src/types/scenario.ts` — DrillDefinition, Event, EventResult, DecisionOption, Trap, InteractiveCockpitEvent, CockpitSuccessCondition
 - `app/src/types/assessment.ts` — DrillMetrics, CBTAScores, ReadbackScore, DecisionScore, TrapScore, TouchScore, InteractiveCockpitScore

@@ -15,6 +15,8 @@ import { TranscriptDisplay } from '@/components/voice/TranscriptDisplay';
 import { PTTButton } from '@/components/voice/PTTButton';
 import { InlineFrequencyNumpad } from '@/components/controls/InlineFrequencyNumpad';
 import { isFrequencyAction, frequencyMatchesExpected } from '@/lib/frequency-utils';
+import { MapDisplay } from '@/components/map/MapDisplay';
+import { FlightPlanTab } from '@/components/cockpit/FlightPlanTab';
 import type { DrillDefinition, ATCInstructionEvent, CockpitActionEvent } from '@/types';
 
 interface InteractiveMFDProps {
@@ -47,7 +49,6 @@ export function InteractiveMFD({
   const setActiveTab = useUIStore((s) => s.setMfdTab);
   const activeFrequency = useCockpitStore((s) => s.activeFrequency);
   const standbyFrequency = useCockpitStore((s) => s.standbyFrequency);
-  const flightPlan = useCockpitStore((s) => s.flightPlan);
   const currentAltitude = useCockpitStore((s) => s.altitude);
   const desiredAltitude = useCockpitStore((s) => s.desiredAltitude);
 
@@ -154,7 +155,8 @@ export function InteractiveMFD({
           </div>
         </div>
 
-        <div className="flex-1 bg-[#0f1923] p-4 overflow-auto">
+        {/* Map tab: relative+overflow-hidden so absolute children fill the panel */}
+        <div className={`flex-1 relative bg-[#0f1923] ${activeTab !== 'map' ? 'overflow-auto p-4' : 'overflow-hidden'}`}>
           {activeTab === 'home' && <HomeTab />}
           {activeTab === 'radios' && (
             <RadiosTab
@@ -164,12 +166,7 @@ export function InteractiveMFD({
               freqActionDone={freqActionDone}
             />
           )}
-          {activeTab === 'flightplan' && (
-            <FlightPlanTab
-              flightPlan={flightPlan}
-              desiredAltitude={desiredAltitude}
-            />
-          )}
+          {activeTab === 'flightplan' && <FlightPlanTab />}
           {activeTab === 'map' && <MapTab />}
           {activeTab === 'checklists' && <ChecklistsTab />}
           {activeTab === 'messages' && (
@@ -950,79 +947,11 @@ function RadiosTab({
   );
 }
 
-function FlightPlanTab({
-  flightPlan,
-  desiredAltitude,
-}: {
-  flightPlan: { id: string; name: string; altitude: number; isActive: boolean }[];
-  desiredAltitude: number;
-}) {
-  if (flightPlan.length === 0) {
-    return (
-      <div className="text-cyan-400/50 text-sm text-center py-8 font-mono">
-        No flight plan loaded
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {flightPlan.map((wp, i) => {
-        const isActiveWaypoint = wp.isActive;
-        const borderColor = isActiveWaypoint
-          ? 'border-fuchsia-600/50 bg-fuchsia-950/30'
-          : i === flightPlan.length - 1
-            ? 'border-green-600/50 bg-green-950/20'
-            : 'border-cyan-600/50 bg-slate-900/40';
-
-        return (
-          <div
-            key={wp.id}
-            className={`border rounded-lg p-3 transition-all shadow-md ${borderColor}`}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <div
-                  className={`font-bold mb-1 ${
-                    isActiveWaypoint
-                      ? 'text-fuchsia-400 text-lg'
-                      : i === flightPlan.length - 1
-                        ? 'text-green-400 text-lg'
-                        : 'text-cyan-300'
-                  }`}
-                >
-                  {isActiveWaypoint ? '+ ' : i === flightPlan.length - 1 ? '\u2708 ' : '\u25C6 '}
-                  {wp.name}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-cyan-200 font-bold font-mono">
-                  {wp.altitude.toLocaleString()} ft
-                </div>
-              </div>
-            </div>
-            {isActiveWaypoint && (
-              <div className="mt-2 pt-2 border-t border-fuchsia-600/30">
-                <div className="text-[10px] text-fuchsia-300/70 font-mono">
-                  CONSTRAINT: {desiredAltitude.toLocaleString()} ft
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function MapTab() {
+  // Absolute fill: breaks out of overflow-auto height containment issue
   return (
-    <div className="flex-1 flex flex-col items-center justify-center py-12">
-      <div className="text-cyan-400/30 text-5xl mb-4">{'\uD83D\uDDFA'}</div>
-      <div className="text-cyan-300 font-mono text-sm mb-1">Map Display</div>
-      <div className="text-cyan-400/50 text-xs font-mono">
-        Enroute map view &mdash; coming soon
-      </div>
+    <div className="absolute inset-0 overflow-hidden">
+      <MapDisplay />
     </div>
   );
 }

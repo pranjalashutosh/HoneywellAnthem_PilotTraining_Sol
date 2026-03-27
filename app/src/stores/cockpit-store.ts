@@ -5,6 +5,8 @@ import type { CockpitMode, Waypoint, Frequency } from '@/types';
 
 interface CockpitStore {
   flightPlan: Waypoint[];
+  activeRouteId: string;
+  selectedWaypointId: string | null;
   activeFrequency: Frequency;
   standbyFrequency: Frequency;
   selectedMode: CockpitMode;
@@ -29,11 +31,15 @@ interface CockpitStore {
   setAutopilot: (on: boolean) => void;
   setAutoThrottle: (on: boolean) => void;
   loadFlightPlan: (plan: Waypoint[]) => void;
+  setActiveRouteId: (id: string) => void;
+  setSelectedWaypointId: (id: string | null) => void;
   reset: () => void;
 }
 
 const defaultState = {
   flightPlan: [] as Waypoint[],
+  activeRouteId: 'kteb-kpbi',
+  selectedWaypointId: null as string | null,
   activeFrequency: { value: 121.5, label: 'Guard' } as Frequency,
   standbyFrequency: { value: 124.35, label: 'Boston Center' } as Frequency,
   selectedMode: 'NAV' as CockpitMode,
@@ -88,6 +94,10 @@ export const useCockpitStore = create<CockpitStore>((set) => ({
   setAutoThrottle: (on) => set({ autoThrottle: on }),
 
   loadFlightPlan: (plan) => set({ flightPlan: plan }),
+
+  setActiveRouteId: (id) => set({ activeRouteId: id }),
+
+  setSelectedWaypointId: (id) => set({ selectedWaypointId: id }),
 
   reset: () => set(defaultState),
 }));
