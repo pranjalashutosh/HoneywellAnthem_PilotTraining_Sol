@@ -113,31 +113,31 @@ export function InteractiveMFD({
 
   return (
     <div
-      className="bg-gradient-to-b from-[#1a2736] to-[#0f1923] flex flex-col border-l border-slate-700/50 shrink-0"
-      style={{ width: width ?? 420 }}
+      className="flex flex-col border-l border-white/10 shrink-0"
+      style={{ backgroundColor: 'rgba(10,15,25,0.92)', width: width ?? 420 }}
     >
       {/* Tab bar */}
-      <div className="bg-gradient-to-b from-[#2a3948] to-[#1f2d3c] border-b border-cyan-700/30 flex items-center justify-around py-3 px-2 shadow-lg">
+      <div className="border-b border-white/10 flex items-center justify-around py-3 px-2 shadow-lg" style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}>
         {TAB_CONFIG.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-lg transition-all ${
               activeTab === tab.id
-                ? 'bg-cyan-900/40'
-                : 'hover:bg-cyan-900/30'
+                ? 'bg-[#4EFFFC]/10'
+                : 'hover:bg-white/5'
             }`}
           >
             <span
               className={`text-lg ${
-                activeTab === tab.id ? 'text-cyan-300' : 'text-cyan-400'
+                activeTab === tab.id ? 'text-[#4EFFFC]' : 'text-white/50'
               }`}
             >
               {tab.icon}
             </span>
             <span
-              className={`text-[9px] font-mono tracking-wide ${
-                activeTab === tab.id ? 'text-cyan-300' : 'text-cyan-400'
+              className={`text-[9px] font-graduate tracking-wide ${
+                activeTab === tab.id ? 'text-[#A6FAF8]' : 'text-white/40'
               }`}
             >
               {tab.label}
@@ -149,8 +149,8 @@ export function InteractiveMFD({
       {/* Content area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Tab header */}
-        <div className="bg-gradient-to-r from-[#232e3d] to-[#1a2533] border-b border-cyan-700/20 px-4 py-2.5 shadow-sm">
-          <div className="text-cyan-300 text-sm font-mono tracking-wider font-bold">
+        <div className="border-b border-white/10 px-4 py-2.5 shadow-sm" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <div className="text-[#A6FAF8] text-sm font-graduate tracking-wider font-bold">
             {TAB_CONFIG.find((t) => t.id === activeTab)?.label}
           </div>
         </div>
@@ -621,11 +621,14 @@ function RadiosTab({
   const atcSpokenRef = useRef<number>(-1);
   const freqActionStartRef = useRef<number>(0);
   const freqResultRecordedRef = useRef(false);
+  const readbackCountAtEventStartRef = useRef(0);
 
-  // Reset contactAccepted when event changes
+  // Reset contactAccepted when event changes; snapshot readback count for ATC events
   useEffect(() => {
     setContactAccepted(false);
     freqResultRecordedRef.current = false;
+    readbackCountAtEventStartRef.current =
+      useAssessmentStore.getState().currentDrillMetrics?.readbackScores.length ?? 0;
   }, [currentEventIndex]);
 
   // Track start time for frequency cockpit_action events
@@ -917,13 +920,31 @@ function RadiosTab({
             )}
           </div>
 
-          {/* Continue button */}
-          <button
-            onClick={handleAdvanceOrComplete}
-            className="w-full py-3 rounded-lg bg-cyan-600/20 border border-cyan-500/50 text-cyan-300 font-bold text-sm hover:bg-cyan-600/30 transition-colors min-h-[44px] shrink-0"
-          >
-            Continue
-          </button>
+          {/* Continue button — only shown for voice path (keyboard fallback buttons handle their own advance) */}
+          {livekitConnected && (
+            <button
+              onClick={() => {
+                // Record EventResult for voice-path ATC events
+                const currentReadbacks =
+                  useAssessmentStore.getState().currentDrillMetrics?.readbackScores.length ?? 0;
+                const receivedAssessment = currentReadbacks > readbackCountAtEventStartRef.current;
+                const latestReadback = receivedAssessment
+                  ? useAssessmentStore.getState().currentDrillMetrics?.readbackScores[currentReadbacks - 1]
+                  : null;
+                recordResult({
+                  eventType: 'atc_instruction',
+                  success: latestReadback
+                    ? latestReadback.confidenceAdjustedAccuracy >= 70
+                    : true,
+                  details: { mode: 'voice', receivedAssessment },
+                });
+                handleAdvanceOrComplete();
+              }}
+              className="w-full py-3 rounded-lg bg-cyan-600/20 border border-cyan-500/50 text-cyan-300 font-bold text-sm hover:bg-cyan-600/30 transition-colors min-h-[44px] shrink-0"
+            >
+              Continue
+            </button>
+          )}
         </div>
       )}
 

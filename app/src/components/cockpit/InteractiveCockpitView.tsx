@@ -7,7 +7,7 @@ import { useAssessmentStore } from '@/stores/assessment-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useInteractiveCockpitTracker } from '@/hooks/useInteractiveCockpitTracker';
 import { AutopilotControlBar } from './AutopilotControlBar';
-import { InteractivePFD } from './InteractivePFD';
+import { InteractivePFD } from './pfd';
 import { InteractiveMFD } from './InteractiveMFD';
 import { ATCCommunicationOverlay } from './ATCCommunicationOverlay';
 import { ResizeHandle } from './ResizeHandle';
@@ -98,7 +98,7 @@ export function InteractiveCockpitView({
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0A1828]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#070c14]">
       {/* Top control bar */}
       <AutopilotControlBar onModeChange={handleModeChange} />
 

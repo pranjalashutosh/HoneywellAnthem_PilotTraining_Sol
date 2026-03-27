@@ -5,7 +5,7 @@ import type { CognitiveLoadScore } from './cognitive-load';
 
 export type CBTACompetency = 'COM' | 'WLM' | 'SAW' | 'KNO' | 'PSD' | 'FPM';
 
-export type ScoringBasis = 'confident' | 'uncertain' | 'abstained';
+export type ScoringBasis = 'confident' | 'uncertain' | 'abstained' | 'manual';
 
 export interface UncertainElement {
   element: string;

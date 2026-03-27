@@ -29,9 +29,11 @@ export function SessionSummary() {
 
   const drillCount = history.length;
 
-  // Average readback accuracy from all drills
+  // Average readback accuracy from all drills (exclude manual and abstained — voice metrics only)
   const allReadbacks = history.flatMap((r) =>
-    r.metrics.readbackScores.filter((s) => s.scoringBasis !== 'abstained'),
+    r.metrics.readbackScores.filter(
+      (s) => s.scoringBasis !== 'abstained' && s.scoringBasis !== 'manual',
+    ),
   );
   const avgAccuracy =
     allReadbacks.length > 0

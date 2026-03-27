@@ -1,5 +1,5 @@
 // Flight Control Panel — mode buttons (VNAV/FLCH/VS/ALT/AP/AUTO) + altitude display
-// Adapted from prototype's top control bar, using cockpit-store instead of local state.
+// Restyled to match avionics PFD design with Graduate font and PFD color palette.
 
 import { useCockpitStore } from '@/stores/cockpit-store';
 import type { CockpitMode } from '@/types';
@@ -31,57 +31,58 @@ export function AutopilotControlBar({ onModeChange }: AutopilotControlBarProps) 
     onModeChange?.(mode);
   };
 
-  const activeClass =
-    'bg-green-500/90 text-black border-green-400 shadow-green-500/30 shadow-md';
-  const inactiveClass =
-    'bg-slate-700/60 text-slate-300 border-slate-600 hover:bg-slate-600/60';
+  const activeStyle = 'bg-[#4EFFFC]/20 text-[#A6FAF8] border-[#4EFFFC]/60 shadow-[0_0_8px_rgba(78,255,252,0.3)]';
+  const inactiveStyle = 'bg-black/30 text-white/70 border-white/20 hover:bg-white/10 hover:text-white';
 
   return (
-    <div className="bg-gradient-to-b from-[#1e3a52] to-[#152a3d] border-b-2 border-cyan-700/40 px-4 py-2.5 flex items-center justify-between shadow-lg">
+    <div
+      className="border-b border-white/10 px-4 py-2.5 flex items-center justify-between shadow-lg"
+      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+    >
       {/* Left: toggle buttons + mode buttons */}
       <div className="flex items-center gap-2">
         <button
           onClick={() => setAutoThrottle(!autoThrottle)}
-          className={`px-4 py-1.5 text-xs font-bold tracking-wider rounded-md border-2 transition-all ${
-            autoThrottle ? activeClass : inactiveClass
+          className={`px-4 py-1.5 text-xs font-bold tracking-wider rounded-md border transition-all font-graduate ${
+            autoThrottle ? activeStyle : inactiveStyle
           }`}
         >
           AUTO
         </button>
 
         <button
-          className="px-4 py-1.5 text-xs font-bold bg-slate-700/60 text-white border-2 border-slate-600 rounded-md shadow-md tabular-nums font-mono"
+          className="px-4 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate bg-black/30 text-[#A6FAF8] border-white/20 tabular-nums"
         >
           {speed}
         </button>
 
-        <button className="px-3 py-1.5 text-xs font-bold bg-green-500/90 text-black border-2 border-green-400 rounded-md shadow-md shadow-green-500/30">
+        <button className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate ${activeStyle}`}>
           AT
         </button>
 
-        <div className="w-px h-7 bg-slate-600 mx-2" />
+        <div className="w-px h-7 bg-white/15 mx-2" />
 
-        <button className="px-3 py-1.5 text-xs font-bold bg-slate-700/60 text-slate-300 border-2 border-slate-600 rounded-md shadow-md">
+        <button className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate ${inactiveStyle}`}>
           AFDS
         </button>
 
         <button
           onClick={() => setAutopilot(!autopilot)}
-          className={`px-3 py-1.5 text-xs font-bold rounded-md border-2 transition-all ${
-            autopilot ? activeClass : inactiveClass
+          className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate ${
+            autopilot ? activeStyle : inactiveStyle
           }`}
         >
           AP
         </button>
 
-        <div className="w-px h-7 bg-slate-600 mx-2" />
+        <div className="w-px h-7 bg-white/15 mx-2" />
 
         {MODE_BUTTONS.map(({ mode, label }) => (
           <button
             key={mode}
             onClick={() => handleModeClick(mode)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md border-2 transition-all shadow-md ${
-              selectedMode === mode ? activeClass : inactiveClass
+            className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all shadow-md font-graduate ${
+              selectedMode === mode ? activeStyle : inactiveStyle
             }`}
           >
             {label}
@@ -89,7 +90,7 @@ export function AutopilotControlBar({ onModeChange }: AutopilotControlBarProps) 
         ))}
 
         <button
-          className="px-4 py-1.5 text-xs font-bold bg-green-500/90 text-black border-2 border-green-400 rounded-md shadow-md shadow-green-500/30 tabular-nums font-mono"
+          className="px-4 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate bg-[#4EFFFC]/20 text-[#A6FAF8] border-[#4EFFFC]/60 tabular-nums"
         >
           {desiredAltitude.toLocaleString()}
         </button>
@@ -97,9 +98,9 @@ export function AutopilotControlBar({ onModeChange }: AutopilotControlBarProps) 
 
       {/* Right: frequency + callsign */}
       <div className="flex items-center gap-6">
-        <div className="text-green-400 text-sm font-mono font-bold">
-          {activeFrequency.value.toFixed(3)}{' '}
-          <span className="text-xs text-cyan-400">{activeFrequency.label}</span>
+        <div className="text-sm font-bold font-graduate">
+          <span className="text-[#A6FAF8]">{activeFrequency.value.toFixed(3)}</span>{' '}
+          <span className="text-xs text-[#4EFFFC]/70">{activeFrequency.label}</span>
         </div>
       </div>
     </div>

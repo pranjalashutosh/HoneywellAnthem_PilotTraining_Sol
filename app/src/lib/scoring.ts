@@ -16,8 +16,8 @@ const MAX_WINDOW = 20;
 /**
  * Compute CBTA competency scores from a single drill's metrics.
  *
- * COM: readback accuracy (70%) + phraseology (15%) + callsign (10%) - latency penalty
- * WLM: task completion (40%) + cognitive load inverted (40%) + ordering (20%)
+ * COM: readback accuracy (40%) + phraseology (25%) + latency score (20%) + callsign (15%)
+ * WLM: task completion (35%) + cognitive load inverted (35%) + sequential task ordering (30%)
  * SAW: decision correctness (50%) + trap detection (30%) + cog load context (20%)
  * KNO: decision correctness (60%) + trap detection (30%) + procedure (10%)
  * PSD: decision correctness (60%) + time-to-decision (30%) + clarification (10%)
@@ -59,26 +59,35 @@ function computeCOM(m: DrillMetrics): number {
   const avgPhrase = avg(valid.map((s) => s.phraseology));
   const callsignPct = valid.filter((s) => s.callsignCorrect).length / valid.length;
 
-  let com = avgAcc * 0.7 + avgPhrase * 0.15 + callsignPct * 100 * 0.1;
-
-  // Latency penalty
+  // Latency score: 100 if <400ms, linear decay to 0 at 3000ms (per Metrics_research.md)
   const avgLatency = avg(valid.map((s) => s.latency.totalPilotLatencyMs));
-  if (avgLatency > 2500) com -= 10;
-  else if (avgLatency > 1500) com -= 5;
+  let latencyScore: number;
+  if (avgLatency <= 0) {
+    // No latency data (manual/keyboard fallback) — neutral score
+    latencyScore = 75;
+  } else if (avgLatency < 400) {
+    latencyScore = 100;
+  } else {
+    latencyScore = Math.max(0, 100 - (avgLatency - 400) / 26);
+  }
 
-  return clamp(com);
+  return clamp(avgAcc * 0.4 + avgPhrase * 0.25 + latencyScore * 0.2 + callsignPct * 100 * 0.15);
 }
 
 function computeWLM(m: DrillMetrics): number {
+  // Time scoring: 0ms=100, 7.5s=50, 15s=0 (fair for 10-15s time limits)
   const touchTime =
     m.touchScores.length > 0
-      ? 100 - Math.min(100, avg(m.touchScores.map((t) => t.timeToComplete)) / 100)
+      ? 100 - Math.min(100, avg(m.touchScores.map((t) => t.timeToComplete)) / 150)
       : 50;
 
   const cogLoadInv =
     m.cognitiveLoadScores.length > 0 ? 100 - avgCalibrated(m.cognitiveLoadScores) : 50;
 
-  return clamp(touchTime * 0.4 + cogLoadInv * 0.4 + 50 * 0.2);
+  // Sequential task ordering: not yet tracked, use neutral default
+  const sequentialScore = 75;
+
+  return clamp(touchTime * 0.35 + cogLoadInv * 0.35 + sequentialScore * 0.3);
 }
 
 function computeSAW(m: DrillMetrics): number {

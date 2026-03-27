@@ -59,6 +59,21 @@ export function DrillOutcome() {
     }
   };
 
+  // Count ATC instruction events before a given index to map to readbackScores array
+  const getReadbackIndex = (eventIndex: number) => {
+    let atcCount = 0;
+    for (let j = 0; j < eventIndex; j++) {
+      if (drill.events[j]?.type === 'atc_instruction') atcCount++;
+    }
+    return atcCount;
+  };
+
+  // Check if all readback scores are manual (no voice data at all)
+  const hasOnlyManualReadbacks =
+    metrics != null &&
+    metrics.readbackScores.length > 0 &&
+    metrics.readbackScores.every((s) => s.scoringBasis === 'manual');
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-120px)] p-6">
       <div className="max-w-lg w-full rounded-lg border border-anthem-border bg-anthem-bg-secondary p-8">
@@ -128,9 +143,11 @@ export function DrillOutcome() {
                     className={
                       score.scoringBasis === 'confident'
                         ? 'text-anthem-green'
-                        : score.scoringBasis === 'uncertain'
-                          ? 'text-anthem-amber'
-                          : 'text-anthem-red'
+                        : score.scoringBasis === 'manual'
+                          ? 'text-anthem-cyan'
+                          : score.scoringBasis === 'uncertain'
+                            ? 'text-anthem-amber'
+                            : 'text-anthem-red'
                     }
                   >
                     {score.scoringBasis.toUpperCase()}
@@ -141,8 +158,20 @@ export function DrillOutcome() {
           </div>
         )}
 
-        {/* Instructor Override UI */}
-        {(hasAbstained || hasUncertain) && !overrideSaved && (
+        {/* Manual assessment note — shown when all readbacks used keyboard fallback */}
+        {hasOnlyManualReadbacks && (
+          <div className="mb-4 rounded border border-anthem-cyan/30 bg-anthem-cyan/5 p-3">
+            <span className="text-xs text-anthem-cyan font-bold">
+              Manual Assessment
+            </span>
+            <p className="text-[10px] text-anthem-text-secondary mt-1">
+              Readback scores based on self-reported accuracy (keyboard fallback). Connect voice for AI-assessed scoring.
+            </p>
+          </div>
+        )}
+
+        {/* Instructor Override UI — only for voice-based uncertain/abstained, not manual */}
+        {(hasAbstained || hasUncertain) && !hasOnlyManualReadbacks && !overrideSaved && (
           <div
             className={[
               'mb-6 rounded border p-4',
@@ -219,6 +248,41 @@ export function DrillOutcome() {
           <div className="space-y-2">
             {drill.events.map((event, i) => {
               const result = eventResults.find((r) => r.eventIndex === i);
+
+              // Per-event detail: readback accuracy or cockpit action timing
+              let detailElement: React.ReactNode = null;
+              if (result && event.type === 'atc_instruction' && metrics) {
+                const rbIdx = getReadbackIndex(i);
+                const readback = metrics.readbackScores[rbIdx];
+                if (readback) {
+                  detailElement = readback.scoringBasis === 'manual' ? (
+                    <span className="text-anthem-cyan text-[10px] font-mono">MANUAL</span>
+                  ) : (
+                    <span className="text-anthem-text-muted text-[10px] font-mono">
+                      {readback.confidenceAdjustedAccuracy.toFixed(0)}%
+                    </span>
+                  );
+                }
+              } else if (result && event.type === 'cockpit_action') {
+                const time = result.details.timeToComplete as number | undefined;
+                if (time && time > 0) {
+                  detailElement = (
+                    <span className="text-anthem-text-muted text-[10px] font-mono">
+                      {(time / 1000).toFixed(1)}s
+                    </span>
+                  );
+                }
+              } else if (result && event.type === 'decision_point') {
+                const time = result.details.timeToDecision as number | undefined;
+                if (time && time > 0) {
+                  detailElement = (
+                    <span className="text-anthem-text-muted text-[10px] font-mono">
+                      {(time / 1000).toFixed(1)}s
+                    </span>
+                  );
+                }
+              }
+
               return (
                 <div
                   key={i}
@@ -232,17 +296,20 @@ export function DrillOutcome() {
                       {eventTypeLabel(event.type)}
                     </span>
                   </div>
-                  <span
-                    className={`text-xs font-mono ${
-                      result?.success
-                        ? 'text-anthem-green'
-                        : result
-                          ? 'text-anthem-red'
-                          : 'text-anthem-text-secondary'
-                    }`}
-                  >
-                    {result?.success ? 'PASS' : result ? 'FAIL' : 'SKIP'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {detailElement}
+                    <span
+                      className={`text-xs font-mono ${
+                        result?.success
+                          ? 'text-anthem-green'
+                          : result
+                            ? 'text-anthem-red'
+                            : 'text-anthem-text-secondary'
+                      }`}
+                    >
+                      {result?.success ? 'PASS' : result ? 'FAIL' : 'SKIP'}
+                    </span>
+                  </div>
                 </div>
               );
             })}

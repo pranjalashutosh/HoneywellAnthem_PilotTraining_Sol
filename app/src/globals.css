@@ -37,6 +37,16 @@
   /* Typography */
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-graduate: 'Graduate', cursive;
+  --font-gravitas: 'Gravitas One', cursive;
+
+  /* PFD instrument colors */
+  --color-pfd-cyan: #4EFFFC;
+  --color-pfd-cyan-light: #A6FAF8;
+  --color-pfd-yellow: #F2E900;
+  --color-pfd-gold: #FFCC66;
+  --color-pfd-magenta: #C06AF5;
+  --color-pfd-compass-cyan: #5EE0FF;
 }
 
 /* shadcn/ui chart color variables */

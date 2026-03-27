@@ -4,7 +4,7 @@ import { useScenarioStore } from '@/stores/scenario-store';
 import { useCockpitStore } from '@/stores/cockpit-store';
 import { useAssessmentStore } from '@/stores/assessment-store';
 import { useVoiceStore } from '@/stores/voice-store';
-import { finalizeDrillAssessment } from '@/services/assessment-engine';
+import { finalizeDrillAssessment, createManualReadbackScore } from '@/services/assessment-engine';
 import type { DrillDefinition, EventResult, DecisionScore, TrapScore, TouchScore, InteractiveCockpitScore } from '@/types';
 import { allDrills } from '@/data/drills';
 
@@ -124,9 +124,14 @@ export function recordEventResult(result: EventResult): void {
     }
 
     // atc_instruction readback scores come from ASSESSMENT_RESULT data channel message
-    // and are handled by assessment-engine.processAssessmentResult()
-    case 'atc_instruction':
+    // and are handled by assessment-engine.processAssessmentResult().
+    // For keyboard fallback, generate a manual ReadbackScore so the pipeline has data.
+    case 'atc_instruction': {
+      if (result.details.mode === 'keyboard-fallback') {
+        assessment.recordReadbackScore(createManualReadbackScore(result.success));
+      }
       break;
+    }
   }
 }
 

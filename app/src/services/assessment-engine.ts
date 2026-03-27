@@ -18,6 +18,37 @@ import type {
   CBTAScores,
 } from '@/types';
 
+// ─── Manual Readback Score (keyboard fallback) ──────────────
+
+/**
+ * Create a placeholder ReadbackScore for keyboard-fallback mode.
+ * scoringBasis 'manual' signals no voice data was used.
+ */
+export function createManualReadbackScore(success: boolean): ReadbackScore {
+  return {
+    rawAccuracy: success ? 100 : 0,
+    confidenceAdjustedAccuracy: success ? 100 : 0,
+    latency: {
+      pilotReactionMs: 0,
+      speechOnsetMs: 0,
+      totalPilotLatencyMs: 0,
+      networkLatencyMs: 0,
+      deepgramProcessingMs: 0,
+      atcAudioEndTimestamp: 0,
+      pttPressTimestamp: 0,
+      localSpeechOnsetTimestamp: 0,
+      deepgramFirstWordStart: 0,
+    },
+    phraseology: success ? 80 : 0,
+    callsignCorrect: success,
+    transcriptConfidence: 0,
+    estimatedWER: 0,
+    scoringBasis: 'manual',
+    uncertainElements: [],
+    criticalElements: [],
+  };
+}
+
 // ─── Assessment Result from Agent ────────────────────────────
 
 interface AgentAssessmentPayload {

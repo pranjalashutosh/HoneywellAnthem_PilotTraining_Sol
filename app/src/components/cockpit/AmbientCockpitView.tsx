@@ -7,7 +7,7 @@ import { useAltitudeSimulation } from '@/hooks/useAltitudeSimulation';
 import { useUIStore } from '@/stores/ui-store';
 import { useDrillRunner } from '@/hooks/useDrillRunner';
 import { AutopilotControlBar } from './AutopilotControlBar';
-import { InteractivePFD } from './InteractivePFD';
+import { InteractivePFD } from './pfd';
 import { InteractiveMFD } from './InteractiveMFD';
 import { InteractiveCockpitView } from './InteractiveCockpitView';
 import { ResizeHandle } from './ResizeHandle';
@@ -93,7 +93,7 @@ export function AmbientCockpitView() {
   // For drill outcome, show it as an overlay
   if (phase === 'outcome') {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#0A1828]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#070c14]">
         <AutopilotControlBar />
         <div className="flex-1 flex overflow-hidden relative">
           <InteractivePFD />
@@ -126,7 +126,7 @@ export function AmbientCockpitView() {
       isFrequencyAction((currentEvent as CockpitActionEvent).expectedAction));
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0A1828]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#070c14]">
       {/* Top control bar */}
       <AutopilotControlBar />
 

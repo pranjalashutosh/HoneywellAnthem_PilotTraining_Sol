@@ -6,16 +6,24 @@
 
 **Before writing ANY code**, Claude MUST read:
 
-1. **`knowledge_map.md`** — Read FIRST. File catalog grouped by feature pipeline. Use to locate files, understand relationships, avoid duplicates.
+1. **`ARCHITECTURE.md`** — Read FIRST. Slim index with system overview, tech stack, full directory structure (every file with one-line descriptions), build commands, key architectural decisions, and links to focused sub-documents in `docs/`.
+
+2. **`docs/arch-*.md`** — Read the relevant sub-document for the subsystem you're working on:
+   - `docs/arch-voice-pipeline.md` — Deepgram STT, ElevenLabs TTS, OpenAI ATC generation, latency measurement
+   - `docs/arch-stores.md` — All 6 Zustand store interfaces and interaction patterns
+   - `docs/arch-drill-system.md` — Drill schema, event types, interactive cockpit subsystem
+   - `docs/arch-assessment.md` — Readback scoring, voice biomarkers, CBTA mapping
+   - `docs/arch-theme.md` — CSS theme tokens and design principles
+   - `docs/arch-supabase.md` — Backend, schema, Edge Functions, analytics
+   - `docs/arch-data-flows.md` — Data flows, data channel messages, component hierarchy
+   - `docs/arch-map-flight-plan.md` — Map Display and Flight Plan module architecture
 
 **After reading**, Claude must:
-- Understand the file landscape before making changes
-- Use the knowledge map to identify which files to read and modify for any given task
+- Understand the file landscape from the directory structure before making changes
+- Use Glob/Grep tools to locate specific files and code patterns
 - Read actual source files directly — code is the source of truth
 
-2. **`ARCHITECTURE.md`** — Read when: (a) user explicitly asks, (b) working on a new subsystem, or (c) need tech stack, design rationale, data flows, or integration specs. Contains: system diagrams, tech stack, directory structure, store design, drill schema, assessment engine, CSS theme, Supabase backend, approved commands.
-
-3. **Reference-only** (read if asked): `implementation_plan.md`, `implementation_tasks.md`, `Metrics_research.md`, `brain_StormDocuments/`
+3. **Reference-only** (read if asked): `Metrics_research.md`, `brain_StormDocuments/`
 
 ---
 
@@ -71,13 +79,12 @@ After writing or modifying code, Claude MUST run this validation loop before mar
 
 After completing code work (and after the Validation Loop passes), Claude MUST check and update:
 
-1. **`knowledge_map.md`** — If any files were **created, renamed, moved, or deleted**, update the knowledge map to reflect the change. Add new files under the correct feature pipeline group with a one-line description. Remove entries for deleted files.
+1. **`ARCHITECTURE.md`** — If any files were **created, renamed, moved, or deleted**, update the directory structure in ARCHITECTURE.md. Add new files with a one-line description. Remove entries for deleted files.
 
-2. **`ARCHITECTURE.md`** — If the code change introduces something **not already documented** in ARCHITECTURE.md, update the relevant section. This includes:
+2. **`docs/arch-*.md`** — If the code change introduces something **not already documented** in the relevant architecture sub-document, update it. This includes:
    - New subsystems, services, or modules
    - New data flows or integration points
    - New stores, types, or API endpoints
-   - Changes to the directory structure
    - New dependencies or tech stack additions
    - New or changed Supabase tables, Edge Functions, or RPC functions
 
@@ -91,7 +98,7 @@ After completing code work (and after the Validation Loop passes), Claude MUST c
 
 ## MCP Tools — Development Workflow
 
-Two MCP servers are connected via `.mcp.json`. Claude MUST use these proactively during development instead of asking the user to run commands manually or writing files that require manual deployment.
+Three MCP servers are connected via `.mcp.json`. Claude MUST use these proactively during development instead of asking the user to run commands manually or writing files that require manual deployment.
 
 ### Available Servers
 
@@ -99,6 +106,7 @@ Two MCP servers are connected via `.mcp.json`. Claude MUST use these proactively
 |--------|---------|
 | **fetch** | Retrieve web pages, API docs, external references |
 | **supabase-mcp** | Manage Supabase: database schema, Edge Functions, types, logs |
+| **figma** | Retrieve Figma design data and download exported images |
 
 ### Supabase MCP — When to Use
 
@@ -130,9 +138,14 @@ Two MCP servers are connected via `.mcp.json`. Claude MUST use these proactively
 **Documentation lookup:**
 - `search_docs` — Search Supabase documentation for API usage, RLS policies, Edge Function patterns, etc.
 
+### Figma MCP — When to Use
+
+- `get_figma_data` — Inspect design files for layout specs, component structure, spacing, colors
+- `download_figma_images` — Export assets (icons, illustrations) from Figma frames for use in the app
+
 ### Fetch MCP — When to Use
 
-- Looking up LiveKit, Deepgram, ElevenLabs, or Supabase documentation pages
+- Looking up LiveKit, Deepgram, ElevenLabs, Google Maps, or Supabase documentation pages
 - Checking API references when implementing integrations
 - Fetching any external resource referenced in implementation tasks or ARCHITECTURE.md
 
@@ -181,6 +194,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 | `ui` | Shared components, theme |
 | `layout` | TopNavBar, CockpitShell, StatusBar |
 | `cockpit` | Cockpit panels, controls |
+| `map` | Map display, route overlays, flight plan tab |
 | `data` | Static data (flight plans, frequencies, drills) |
 | `telemetry` | Anthem telemetry abstraction |
 | `db` | Supabase schema, migrations, seed data |

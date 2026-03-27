@@ -1,4 +1,4 @@
-// T2.7 + T9.2 + T9.4 + T9.5 + T9.6 — Status bar with degradation badges
+// Status bar with degradation badges — restyled with Graduate font and PFD palette.
 
 import { useEffect, useState } from 'react';
 import { useCockpitStore } from '@/stores/cockpit-store';
@@ -34,11 +34,11 @@ function DegradationBadge({
       ? 'text-anthem-amber border-anthem-amber/30 bg-anthem-amber/5'
       : color === 'red'
         ? 'text-anthem-red border-anthem-red/30 bg-anthem-red/5'
-        : 'text-anthem-cyan border-anthem-cyan/30 bg-anthem-cyan/5';
+        : 'text-[#4EFFFC] border-[#4EFFFC]/30 bg-[#4EFFFC]/5';
 
   return (
     <span
-      className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${colorClass}`}
+      className={`text-[9px] font-graduate uppercase px-1.5 py-0.5 rounded border ${colorClass}`}
     >
       {label}
     </span>
@@ -67,18 +67,21 @@ export function StatusBar() {
     : null;
 
   return (
-    <footer className="flex items-center justify-between h-8 px-4 bg-anthem-bg-secondary border-t border-anthem-border text-xs">
+    <footer
+      className="flex items-center justify-between h-8 px-4 border-t border-white/10 text-xs"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+    >
       <div className="flex items-center gap-4">
-        <span className="font-mono text-anthem-text-secondary">{utc}</span>
-        <span className="text-anthem-text-muted">|</span>
-        <span className="font-mono text-anthem-cyan">
+        <span className="font-graduate text-white/60">{utc}</span>
+        <span className="text-white/20">|</span>
+        <span className="font-graduate text-[#4EFFFC]">
           {activeFrequency.value.toFixed(3)}
         </span>
-        <span className="text-anthem-text-muted">{activeFrequency.label}</span>
+        <span className="text-white/40 font-graduate">{activeFrequency.label}</span>
         {activePilot && (
           <>
-            <span className="text-anthem-text-muted">|</span>
-            <span className="font-mono text-anthem-text-secondary">
+            <span className="text-white/20">|</span>
+            <span className="font-graduate text-white/60">
               {activePilot.name}
             </span>
           </>
@@ -94,7 +97,7 @@ export function StatusBar() {
         {showCalibration && calibrationLabel && (
           <span
             className={[
-              'text-[10px] font-mono',
+              'text-[10px] font-graduate',
               baseline?.isCalibrated ? 'text-anthem-green' : 'text-anthem-amber',
             ].join(' ')}
           >
@@ -102,27 +105,27 @@ export function StatusBar() {
           </span>
         )}
 
-        <span className="text-anthem-text-muted">|</span>
+        <span className="text-white/20">|</span>
 
         {drillPhase !== 'idle' && activeDrill ? (
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-anthem-green animate-pulse" />
-            <span className="text-anthem-green font-mono text-[10px]">
+            <span className="text-anthem-green font-graduate text-[10px]">
               {activeDrill.title}
             </span>
           </span>
         ) : (
-          <span className="text-anthem-text-muted">No Active Drill</span>
+          <span className="text-white/40 font-graduate">No Active Drill</span>
         )}
-        <span className="text-anthem-text-muted">|</span>
+        <span className="text-white/20">|</span>
         <span className="flex items-center gap-1.5">
           <span
             className={[
               'inline-block w-2 h-2 rounded-full',
-              livekitConnected ? 'bg-anthem-green' : 'bg-anthem-text-muted',
+              livekitConnected ? 'bg-anthem-green' : 'bg-white/30',
             ].join(' ')}
           />
-          <span className="text-anthem-text-muted">
+          <span className="text-white/40 font-graduate">
             {livekitConnected ? 'Connected' : 'Offline'}
           </span>
         </span>
