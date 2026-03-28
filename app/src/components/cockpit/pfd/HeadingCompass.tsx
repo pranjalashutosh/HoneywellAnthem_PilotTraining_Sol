@@ -80,16 +80,11 @@ export function HeadingCompass({ heading }: HeadingCompassProps) {
     >
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE}>
         {/* Outer background circle */}
-        <g opacity="0.6">
-          <ellipse cx={CX} cy={CY} rx={OUTER_R} ry={OUTER_R} fill="black" opacity="0.1" />
-          <ellipse cx={CX} cy={CY} rx={OUTER_R} ry={OUTER_R} fill="none" stroke="black" strokeWidth="2" />
-          <ellipse cx={CX} cy={CY} rx={OUTER_R - 1} ry={OUTER_R - 1} fill="none" stroke="black" strokeWidth="1.5" />
-        </g>
+        <ellipse cx={CX} cy={CY} rx={OUTER_R} ry={OUTER_R} fill="rgba(0,0,0,0.38)" />
+        <ellipse cx={CX} cy={CY} rx={OUTER_R} ry={OUTER_R} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5" />
 
         {/* Inner circle */}
-        <g opacity="0.12">
-          <ellipse cx={CX} cy={CY} rx={INNER_R} ry={INNER_R} fill="black" opacity="0.1" />
-        </g>
+        <ellipse cx={CX} cy={CY} rx={INNER_R} ry={INNER_R} fill="rgba(0,0,0,0.22)" />
 
         {/* Rotating compass group */}
         <g
@@ -107,18 +102,18 @@ export function HeadingCompass({ heading }: HeadingCompassProps) {
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke="black"
+              stroke={t.weight === 2 ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.4)'}
               strokeWidth={t.weight}
             />
           ))}
 
-          {/* Degree labels — smaller font */}
+          {/* Degree labels */}
           {degreePositions.map((d) => (
             <text
               key={d.deg}
               x={d.x}
               y={d.y + 6}
-              fill="black"
+              fill="rgba(255,255,255,0.5)"
               fontSize="16"
               fontFamily={PFD.FONT_GRADUATE}
               textAnchor="middle"
@@ -133,11 +128,11 @@ export function HeadingCompass({ heading }: HeadingCompassProps) {
               key={c.label}
               x={c.x}
               y={c.y + 8}
-              fill={c.isCyan ? PFD.COMPASS_CYAN : 'black'}
-              fontSize="22"
+              fill={c.isCyan ? PFD.COMPASS_CYAN : 'rgba(255,255,255,0.72)'}
+              fontSize="24"
               fontFamily={PFD.FONT_GRAVITAS}
               textAnchor="middle"
-              fontWeight="400"
+              fontWeight="600"
             >
               {c.label}
             </text>

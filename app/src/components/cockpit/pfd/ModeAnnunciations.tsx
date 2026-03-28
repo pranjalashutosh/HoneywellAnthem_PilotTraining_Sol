@@ -26,17 +26,27 @@ export function ModeAnnunciations({
       {/* Mode annunciations (top center) */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
         <div
-          className="px-2.5 py-0.5 rounded text-xs font-bold shadow font-graduate"
-          style={{ backgroundColor: 'rgba(34,197,94,0.85)', color: '#000' }}
+          className="font-bold font-graduate"
+          style={{
+            fontSize: 12,
+            padding: '3px 12px',
+            borderRadius: 4,
+            backgroundColor: 'rgba(13,115,119,0.35)',
+            border: '1px solid rgba(13,115,119,0.6)',
+            color: '#5eead4',
+          }}
         >
           {modeDisplay}
         </div>
         <div
-          className="px-2.5 py-0.5 rounded text-xs border shadow font-graduate"
+          className="font-bold font-graduate"
           style={{
-            backgroundColor: 'rgba(0,0,0,0.45)',
-            color: '#A6FAF8',
-            borderColor: 'rgba(78,255,252,0.3)',
+            fontSize: 12,
+            padding: '3px 12px',
+            borderRadius: 4,
+            backgroundColor: 'rgba(6,16,26,0.7)',
+            border: '1px solid rgba(13,115,119,0.4)',
+            color: '#5eead4',
           }}
         >
           {status}
@@ -65,11 +75,11 @@ export function ModeAnnunciations({
           className="px-3 py-1.5 text-xs font-bold rounded border transition-all shadow font-graduate"
           style={
             selectedMode === 'VS'
-              ? { backgroundColor: 'rgba(34,197,94,0.85)', color: '#000', borderColor: '#22c55e' }
+              ? { backgroundColor: '#0d7377', color: '#fff', borderColor: '#0d7377' }
               : {
-                  backgroundColor: 'rgba(0,0,0,0.45)',
-                  color: '#A6FAF8',
-                  borderColor: 'rgba(78,255,252,0.3)',
+                  backgroundColor: 'rgba(6,16,26,0.7)',
+                  color: '#5eead4',
+                  borderColor: 'rgba(13,115,119,0.4)',
                 }
           }
         >

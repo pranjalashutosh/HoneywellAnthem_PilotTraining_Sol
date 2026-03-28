@@ -38,7 +38,7 @@ function DegradationBadge({
 
   return (
     <span
-      className={`text-[9px] font-graduate uppercase px-1.5 py-0.5 rounded border ${colorClass}`}
+      className={`text-[11px] font-graduate uppercase px-1.5 py-0.5 rounded border ${colorClass}`}
     >
       {label}
     </span>
@@ -66,29 +66,31 @@ export function StatusBar() {
       : `Calibrating (${baseline.sampleCount}/10)`
     : null;
 
+  const divider = <div className="w-px h-4 shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />;
+
   return (
     <footer
-      className="flex items-center justify-between h-8 px-4 border-t border-white/10 text-xs"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      className="flex items-center justify-between px-4 text-[14px]"
+      style={{ height: 38, backgroundColor: 'rgba(6,16,26,0.88)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
     >
-      <div className="flex items-center gap-4">
-        <span className="font-graduate text-white/60">{utc}</span>
-        <span className="text-white/20">|</span>
-        <span className="font-graduate text-[#4EFFFC]">
+      <div className="flex items-center gap-[18px]">
+        <span className="font-graduate font-medium text-white/75">{utc}</span>
+        {divider}
+        <span className="font-graduate font-semibold" style={{ color: '#22d3ee' }}>
           {activeFrequency.value.toFixed(3)}
         </span>
-        <span className="text-white/40 font-graduate">{activeFrequency.label}</span>
+        <span className="font-graduate font-medium text-white/50">{activeFrequency.label}</span>
         {activePilot && (
           <>
-            <span className="text-white/20">|</span>
-            <span className="font-graduate text-white/60">
+            {divider}
+            <span className="font-graduate font-medium text-white/75">
               {activePilot.name}
             </span>
           </>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-[18px]">
         {/* Degradation badges */}
         {!hasLiveKitUrl && <DegradationBadge label="Voice Unavailable" color="amber" />}
         {!hasSupabase && <DegradationBadge label="Offline Mode" color="amber" />}
@@ -97,35 +99,35 @@ export function StatusBar() {
         {showCalibration && calibrationLabel && (
           <span
             className={[
-              'text-[10px] font-graduate',
-              baseline?.isCalibrated ? 'text-anthem-green' : 'text-anthem-amber',
+              'font-graduate font-semibold',
+              baseline?.isCalibrated ? 'text-[#34d399]' : 'text-anthem-amber',
             ].join(' ')}
           >
             {calibrationLabel}
           </span>
         )}
 
-        <span className="text-white/20">|</span>
+        {divider}
 
         {drillPhase !== 'idle' && activeDrill ? (
           <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-anthem-green animate-pulse" />
-            <span className="text-anthem-green font-graduate text-[10px]">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#34d399] animate-pulse" />
+            <span className="font-graduate font-medium text-[#34d399]">
               {activeDrill.title}
             </span>
           </span>
         ) : (
-          <span className="text-white/40 font-graduate">No Active Drill</span>
+          <span className="text-white/40 font-graduate font-medium">No Active Drill</span>
         )}
-        <span className="text-white/20">|</span>
+        {divider}
         <span className="flex items-center gap-1.5">
           <span
             className={[
               'inline-block w-2 h-2 rounded-full',
-              livekitConnected ? 'bg-anthem-green' : 'bg-white/30',
+              livekitConnected ? 'bg-[#34d399]' : 'bg-white/30',
             ].join(' ')}
           />
-          <span className="text-white/40 font-graduate">
+          <span className="text-white/50 font-graduate font-medium">
             {livekitConnected ? 'Connected' : 'Offline'}
           </span>
         </span>

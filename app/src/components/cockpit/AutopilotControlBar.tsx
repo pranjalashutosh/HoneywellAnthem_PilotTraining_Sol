@@ -31,76 +31,83 @@ export function AutopilotControlBar({ onModeChange }: AutopilotControlBarProps) 
     onModeChange?.(mode);
   };
 
-  const activeStyle = 'bg-[#4EFFFC]/20 text-[#A6FAF8] border-[#4EFFFC]/60 shadow-[0_0_8px_rgba(78,255,252,0.3)]';
-  const inactiveStyle = 'bg-black/30 text-white/70 border-white/20 hover:bg-white/10 hover:text-white';
+  // Anthem signature: solid teal active, transparent inactive
+  const activeStyle = 'bg-[#0d7377] text-white border-[#0d7377]';
+  const inactiveStyle = 'bg-transparent text-white/35 border-white/10 hover:bg-white/5 hover:text-white/60';
+  // 34px height, 13px — readable at cockpit distance without squinting
+  const pillBase = 'h-[34px] px-3.5 flex items-center text-[13px] font-bold rounded border transition-all font-graduate';
 
   return (
     <div
-      className="border-b border-white/10 px-4 py-2.5 flex items-center justify-between shadow-lg"
-      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+      className="border-b px-4 py-2 flex items-center justify-between"
+      style={{ backgroundColor: 'rgba(6,16,26,0.95)', borderBottomColor: 'rgba(255,255,255,0.06)' }}
     >
-      {/* Left: toggle buttons + mode buttons */}
+      {/* Left: 3 semantic groups with grouped containers and dividers */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => setAutoThrottle(!autoThrottle)}
-          className={`px-4 py-1.5 text-xs font-bold tracking-wider rounded-md border transition-all font-graduate ${
-            autoThrottle ? activeStyle : inactiveStyle
-          }`}
+
+        {/* Group 1 — AP engagement: AUTO · AT · AFDS · AP */}
+        <div
+          className="flex items-center gap-1"
+          style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '3px 6px' }}
         >
-          AUTO
-        </button>
-
-        <button
-          className="px-4 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate bg-black/30 text-[#A6FAF8] border-white/20 tabular-nums"
-        >
-          {speed}
-        </button>
-
-        <button className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate ${activeStyle}`}>
-          AT
-        </button>
-
-        <div className="w-px h-7 bg-white/15 mx-2" />
-
-        <button className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate ${inactiveStyle}`}>
-          AFDS
-        </button>
-
-        <button
-          onClick={() => setAutopilot(!autopilot)}
-          className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate ${
-            autopilot ? activeStyle : inactiveStyle
-          }`}
-        >
-          AP
-        </button>
-
-        <div className="w-px h-7 bg-white/15 mx-2" />
-
-        {MODE_BUTTONS.map(({ mode, label }) => (
           <button
-            key={mode}
-            onClick={() => handleModeClick(mode)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all shadow-md font-graduate ${
-              selectedMode === mode ? activeStyle : inactiveStyle
-            }`}
+            onClick={() => setAutoThrottle(!autoThrottle)}
+            className={`${pillBase} ${autoThrottle ? activeStyle : inactiveStyle}`}
           >
-            {label}
+            AUTO
           </button>
-        ))}
+          <button className={`${pillBase} ${activeStyle}`}>AT</button>
+          <button className={`${pillBase} ${inactiveStyle}`}>AFDS</button>
+          <button
+            onClick={() => setAutopilot(!autopilot)}
+            className={`${pillBase} ${autopilot ? activeStyle : inactiveStyle}`}
+          >
+            AP
+          </button>
+        </div>
 
-        <button
-          className="px-4 py-1.5 text-xs font-bold rounded-md border transition-all font-graduate bg-[#4EFFFC]/20 text-[#A6FAF8] border-[#4EFFFC]/60 tabular-nums"
+        <div className="w-px h-[22px] mx-1" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
+
+        {/* Group 2 — Mode selection: FLC · VNAV · ALT · V/S */}
+        <div
+          className="flex items-center gap-1"
+          style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '3px 6px' }}
         >
-          {desiredAltitude.toLocaleString()}
-        </button>
+          {MODE_BUTTONS.map(({ mode, label }) => (
+            <button
+              key={mode}
+              onClick={() => handleModeClick(mode)}
+              className={`${pillBase} ${selectedMode === mode ? activeStyle : inactiveStyle}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-px h-[22px] mx-1" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
+
+        {/* Group 3 — Target value readouts: SPD · ALT (data display, not toggles) */}
+        <div
+          className="h-[34px] flex items-center gap-2 px-3.5"
+          style={{ background: 'rgba(13,115,119,0.2)', border: '1px solid rgba(13,115,119,0.5)', borderRadius: 6 }}
+        >
+          <span className="text-[10px] font-medium text-white/40 font-graduate">SPD</span>
+          <span className="text-[14px] font-semibold font-graduate tabular-nums" style={{ color: '#67e8f9' }}>{speed}</span>
+        </div>
+        <div
+          className="h-[34px] flex items-center gap-2 px-3.5"
+          style={{ background: 'rgba(13,115,119,0.2)', border: '1px solid rgba(13,115,119,0.5)', borderRadius: 6 }}
+        >
+          <span className="text-[10px] font-medium text-white/40 font-graduate">ALT</span>
+          <span className="text-[14px] font-semibold font-graduate tabular-nums" style={{ color: '#67e8f9' }}>{desiredAltitude.toLocaleString()}</span>
+        </div>
       </div>
 
-      {/* Right: frequency + callsign */}
-      <div className="flex items-center gap-6">
-        <div className="text-sm font-bold font-graduate">
-          <span className="text-[#A6FAF8]">{activeFrequency.value.toFixed(3)}</span>{' '}
-          <span className="text-xs text-[#4EFFFC]/70">{activeFrequency.label}</span>
+      {/* Right: active frequency */}
+      <div className="flex items-center gap-2">
+        <div className="font-bold font-graduate">
+          <span className="text-[14px] font-semibold" style={{ color: '#22d3ee' }}>{activeFrequency.value.toFixed(3)}</span>{' '}
+          <span className="text-[12px] text-white/50">{activeFrequency.label}</span>
         </div>
       </div>
     </div>

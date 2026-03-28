@@ -29,12 +29,12 @@ interface InteractiveMFDProps {
 }
 
 const TAB_CONFIG: { id: MFDTab; label: string; icon: string }[] = [
-  { id: 'home', label: 'Home', icon: '\u2302' },
-  { id: 'radios', label: 'Radios', icon: '\u266A' },
-  { id: 'flightplan', label: 'Flight Plan', icon: '\u2708' },
-  { id: 'map', label: 'Map', icon: '\uD83D\uDDFA' },
-  { id: 'checklists', label: 'Checklists', icon: '\u2610' },
-  { id: 'messages', label: 'Messages', icon: '\u26A0' },
+  { id: 'home', label: 'HOME', icon: '\u2302' },
+  { id: 'radios', label: 'RADIOS', icon: '\u266A' },
+  { id: 'flightplan', label: 'FLT PLAN', icon: '\u2708' },
+  { id: 'map', label: 'MAP', icon: '\uD83D\uDDFA' },
+  { id: 'checklists', label: 'CHKLST', icon: '\u2610' },
+  { id: 'messages', label: 'MSGS', icon: '\u26A0' },
 ];
 
 export function InteractiveMFD({
@@ -117,28 +117,42 @@ export function InteractiveMFD({
       style={{ backgroundColor: 'rgba(10,15,25,0.92)', width: width ?? 420 }}
     >
       {/* Tab bar */}
-      <div className="border-b border-white/10 flex items-center justify-around py-3 px-2 shadow-lg" style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}>
+      <div
+        className="flex items-center justify-around px-1"
+        style={{ backgroundColor: 'rgba(6,16,26,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, paddingBottom: 6 }}
+      >
         {TAB_CONFIG.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-lg transition-all ${
-              activeTab === tab.id
-                ? 'bg-[#4EFFFC]/10'
-                : 'hover:bg-white/5'
-            }`}
+            className="flex flex-col items-center justify-center transition-all"
+            style={{
+              gap: 5,
+              minWidth: 52,
+              minHeight: 52,
+              borderRadius: 6,
+              borderBottom: activeTab === tab.id ? '2.5px solid #0d7377' : '2.5px solid transparent',
+              backgroundColor: activeTab === tab.id ? 'rgba(13,115,119,0.08)' : 'transparent',
+              padding: '6px 8px',
+            }}
           >
             <span
-              className={`text-lg ${
-                activeTab === tab.id ? 'text-[#4EFFFC]' : 'text-white/50'
-              }`}
+              style={{
+                fontSize: 20,
+                lineHeight: 1,
+                color: activeTab === tab.id ? '#22d3ee' : 'rgba(255,255,255,0.35)',
+              }}
             >
               {tab.icon}
             </span>
             <span
-              className={`text-[9px] font-graduate tracking-wide ${
-                activeTab === tab.id ? 'text-[#A6FAF8]' : 'text-white/40'
-              }`}
+              className="font-graduate"
+              style={{
+                fontSize: 11,
+                fontWeight: activeTab === tab.id ? 600 : 500,
+                letterSpacing: '0.04em',
+                color: activeTab === tab.id ? '#22d3ee' : 'rgba(255,255,255,0.35)',
+              }}
             >
               {tab.label}
             </span>
@@ -314,42 +328,54 @@ function HomeTab() {
   const setShowAssessment = useUIStore((s) => s.setShowAssessment);
   const sessionHistory = useAssessmentStore((s) => s.sessionHistory);
 
+  const cardStyle = {
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: '12px 14px',
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-[14px] min-h-full">
       {/* Pilot selector */}
-      <div className="bg-slate-900/40 border border-cyan-600/50 rounded-lg p-3">
-        <div className="text-cyan-400/70 text-[10px] font-mono uppercase tracking-wider mb-2">
-          Pilot
+      <div style={cardStyle}>
+        <div className="font-graduate font-semibold mb-2" style={{ fontSize: 14, color: '#22d3ee', letterSpacing: '0.05em' }}>
+          PILOT
         </div>
         <PilotSelector />
       </div>
 
       {/* System Status */}
-      <div className="bg-slate-900/40 border border-cyan-600/50 rounded-lg p-4">
-        <div className="text-cyan-300 font-bold mb-3">System Status</div>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-cyan-400/70">Aircraft:</span>
-            <span className="text-white">Citation CJ3+</span>
+      <div style={cardStyle}>
+        <div className="font-graduate font-semibold mb-3" style={{ fontSize: 14, color: '#22d3ee', letterSpacing: '0.02em' }}>
+          System Status
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between items-baseline">
+            <span style={{ fontSize: 13, color: '#0891b2' }}>Aircraft:</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#e0e8ec' }}>Citation CJ3+</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-cyan-400/70">Registration:</span>
-            <span className="text-white">N389HW</span>
+          <div className="flex justify-between items-baseline">
+            <span style={{ fontSize: 13, color: '#0891b2' }}>Registration:</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#e0e8ec' }}>N389HW</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-cyan-400/70">Flight Time:</span>
-            <span className="text-white">1:23:45</span>
+          <div className="flex justify-between items-baseline">
+            <span style={{ fontSize: 13, color: '#0891b2' }}>Flight Time:</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#e0e8ec' }}>1:23:45</span>
           </div>
         </div>
       </div>
 
       {/* All Systems Normal */}
-      <div className="bg-slate-900/40 border border-green-600/50 rounded-lg p-4">
-        <div className="text-green-300 font-bold mb-2">All Systems Normal</div>
-        <div className="text-xs text-cyan-400/70">No cautions or warnings</div>
+      <div style={{ ...cardStyle, borderColor: 'rgba(52,211,153,0.12)' }}>
+        <div className="font-graduate font-semibold mb-1" style={{ fontSize: 14, color: '#34d399' }}>All Systems Normal</div>
+        <div style={{ fontSize: 12, color: '#0891b2' }}>No cautions or warnings</div>
       </div>
 
-      {/* Training Section — drill lifecycle hub */}
+      {/* Push Training to bottom */}
+      <div className="flex-1" />
+
+      {/* Training Section — anchored to bottom */}
       <TrainingSection
         phase={phase}
         activeDrill={activeDrill}
@@ -361,10 +387,11 @@ function HomeTab() {
       {sessionHistory.length > 0 && (
         <button
           onClick={() => setShowAssessment(true)}
-          className="w-full text-left bg-slate-900/40 border border-cyan-600/50 rounded-lg p-3 hover:border-cyan-400/60 transition-colors"
+          className="w-full text-left transition-colors"
+          style={{ ...cardStyle, borderColor: 'rgba(34,211,238,0.15)' }}
         >
-          <div className="text-cyan-300 font-bold text-sm">View Assessment</div>
-          <div className="text-cyan-400/50 text-xs font-mono mt-1">
+          <div className="font-graduate font-semibold" style={{ fontSize: 14, color: '#22d3ee' }}>View Assessment</div>
+          <div className="mt-1" style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
             {sessionHistory.length} drill{sessionHistory.length !== 1 ? 's' : ''} completed
           </div>
         </button>
@@ -397,15 +424,21 @@ function TrainingSection({
   // Idle — show Start Drill button and drill list
   if (phase === 'idle') {
     return (
-      <div className="bg-slate-900/40 border border-cyan-600/50 rounded-lg p-3">
-        <div className="text-cyan-400 text-xs font-mono tracking-widest mb-3 uppercase">
-          Training
+      <div
+        className="rounded-lg"
+        style={{ background: 'rgba(13,115,119,0.08)', border: '1px solid rgba(13,115,119,0.25)', padding: '16px 18px' }}
+      >
+        <div className="font-graduate font-semibold mb-3" style={{ fontSize: 14, color: '#22d3ee', letterSpacing: '0.06em' }}>
+          TRAINING
         </div>
 
         {!showDrillList ? (
           <button
             onClick={() => setShowDrillList(true)}
-            className="w-full py-3 rounded-lg border-2 border-dashed border-cyan-600/40 text-cyan-300 font-bold text-sm hover:border-cyan-400 hover:bg-cyan-950/20 transition-all min-h-[44px]"
+            className="w-full transition-all active:scale-[0.98] min-h-[44px]"
+            style={{ background: '#0d7377', color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 24px', borderRadius: 6, border: 'none', cursor: 'pointer', letterSpacing: '0.02em' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0f8b8f'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0d7377'; }}
           >
             Start Drill
           </button>

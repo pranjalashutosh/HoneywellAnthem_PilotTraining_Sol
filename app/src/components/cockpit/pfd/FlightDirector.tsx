@@ -33,9 +33,8 @@ export function FlightDirector({ isDescending }: FlightDirectorProps) {
           <div
             style={{
               width: `${width}px`,
-              height: '4px',
-              backgroundColor: 'rgba(0,0,0,0.35)',
-              boxShadow: 'inset 0 3px 3px rgba(0,0,0,0.2)',
+              height: width >= 100 ? '2px' : '2px',
+              backgroundColor: width >= 100 ? 'rgba(255,255,255,0.55)' : width >= 60 ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.32)',
               borderRadius: '1px',
             }}
           />
