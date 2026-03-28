@@ -84,32 +84,21 @@ export function SpeedTape({ speed }: SpeedTapeProps) {
             <rect x={BODY_X} y={SCROLL_TOP} width={BODY_W} height={SCROLL_H} />
           </clipPath>
 
-          {/* Inset shadow filter for pointer — from Figma filter3_i_43_533 */}
-          <filter id="spd-pointer-inset" x="-10%" y="-10%" width="130%" height="130%" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feOffset dx="12" dy="12" />
-            <feGaussianBlur stdDeviation="7.5" />
-            <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0" />
-            <feBlend mode="normal" in2="shape" result="effect1_innerShadow" />
-          </filter>
         </defs>
 
         {/* ── Tape body background — Figma rect (54,37 119×297) ── */}
-        <rect x={BODY_X} y={BODY_Y} width={BODY_W} height={BODY_H} fill="black" fillOpacity="0.2" />
+        <rect x={BODY_X} y={BODY_Y} width={BODY_W} height={BODY_H} fill="black" fillOpacity="0.45" />
 
         {/* ── Top cap — Figma rounded-left path ── */}
         <path
-          opacity="0.4"
+          opacity="0.65"
           d={`M173 37H54V20C54 8.954 62.954 0 74 0H173V37Z`}
           fill="black"
         />
 
         {/* ── Bottom cap — Figma rounded-left path ── */}
         <path
-          opacity="0.4"
+          opacity="0.65"
           d={`M173 334H54V351C54 362.046 62.954 371 74 371H173V334Z`}
           fill="black"
         />
@@ -188,23 +177,20 @@ export function SpeedTape({ speed }: SpeedTapeProps) {
           ))}
         </g>
 
-        {/* ── Speed pointer — exact Figma path (stepped shape, right-pointing arrow) ── */}
-        <g filter="url(#spd-pointer-inset)">
-          <path
-            d="M173 179.932L152.452 185.387C150.699 185.852 149.478 187.439 149.478 189.253V205.394C149.478 207.604 147.687 209.394 145.478 209.394H84.4098C82.2006 209.394 80.4098 211.185 80.4098 213.394V219C80.4098 221.209 78.6189 223 76.4098 223H60C57.7909 223 56 221.209 56 219V143C56 140.791 57.7909 139 60 139H76.4098C78.6189 139 80.4098 140.791 80.4098 143V147.57C80.4098 149.78 82.2006 151.57 84.4097 151.57H145.478C147.687 151.57 149.478 153.361 149.478 155.57V170.151C149.478 171.934 150.658 173.502 152.372 173.995L173 179.932Z"
-            fill="black"
-            fillOpacity="0.2"
-            stroke="white"
-            strokeWidth="4"
-          />
-        </g>
+        {/* ── Speed pointer — clean pentagon, right-pointing arrow ── */}
+        <path
+          d={`M56,${CENTER_Y - 26} H155 L173,${CENTER_Y} L155,${CENTER_Y + 26} H56 Z`}
+          fill="rgba(0,0,0,0.93)"
+          stroke="white"
+          strokeWidth="2"
+        />
 
-        {/* ── Current speed text inside pointer ── */}
+        {/* ── Current speed text — centered inside pointer box ── */}
         <text
-          x={108}
-          y={188}
+          x={106}
+          y={CENTER_Y + 12}
           fill={PFD.WHITE}
-          fontSize="32"
+          fontSize="34"
           fontFamily={PFD.FONT_GRADUATE}
           textAnchor="middle"
         >

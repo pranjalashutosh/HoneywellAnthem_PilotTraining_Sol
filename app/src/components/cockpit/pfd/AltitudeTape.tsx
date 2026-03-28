@@ -20,7 +20,6 @@ const BODY_W = PFD.ALT_TAPE_BODY_W;   // 152
 const BODY_H = PFD.ALT_TAPE_BODY_H;   // 603
 const VS_W = PFD.ALT_VS_W;            // 61
 const VS_H = PFD.ALT_VS_H;            // 383
-const POINTER_H = PFD.ALT_POINTER_H;  // 122
 
 // SVG viewBox: tape body + gap + V/S area
 const VB_W = BODY_W + 2 + VS_W;       // 215
@@ -145,21 +144,10 @@ export function AltitudeTape({
             <rect x="0" y={SCROLL_TOP} width={BODY_W} height={SCROLL_H} />
           </clipPath>
 
-          {/* Inset shadow filter for pointer — from Figma node 41-405 */}
-          <filter id="alt-pointer-inset" x="-10%" y="-10%" width="130%" height="130%" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feOffset dx="12" dy="12" />
-            <feGaussianBlur stdDeviation="7.5" />
-            <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0" />
-            <feBlend mode="normal" in2="shape" result="effect1_innerShadow" />
-          </filter>
         </defs>
 
         {/* ── Tape body background — Figma node 37-47 (152×603) ── */}
-        <g opacity="0.1">
+        <g opacity="0.45">
           <path
             d={`M0 0H${BODY_W - 20}C${BODY_W - 8.954} 0 ${BODY_W} 8.954 ${BODY_W} 20V${BODY_H - 20}C${BODY_W} ${BODY_H - 8.954} ${BODY_W - 8.954} ${BODY_H} ${BODY_W - 20} ${BODY_H}H0V0Z`}
             fill="black"
@@ -167,7 +155,7 @@ export function AltitudeTape({
         </g>
 
         {/* ── V/S area background — Figma node 37-93 (61×383) ── */}
-        <g opacity="0.1" transform={`translate(${VS_X}, ${VS_Y})`}>
+        <g opacity="0.35" transform={`translate(${VS_X}, ${VS_Y})`}>
           <path
             d={`M0 0H${VS_W - 20}C${VS_W - 8.954} 0 ${VS_W} 8.954 ${VS_W} 20V${VS_H - 20}C${VS_W} ${VS_H - 8.954} ${VS_W - 8.954} ${VS_H} ${VS_W - 20} ${VS_H}H0V0Z`}
             fill="black"
@@ -231,7 +219,8 @@ export function AltitudeTape({
                 y1={tick.y}
                 x2={tick.isMajor ? 30 : PFD.ALT_TICK_LEN}
                 y2={tick.y}
-                stroke="black"
+                stroke="white"
+                strokeOpacity="0.7"
                 strokeWidth="3"
               />
               {tick.isMajor && (
@@ -289,28 +278,22 @@ export function AltitudeTape({
           )}
         </g>
 
-        {/* ── Altitude pointer — exact Figma node 41-405 (152×122) ── */}
-        <g
-          transform={`translate(0, ${CENTER_Y - POINTER_H / 2})`}
-          filter="url(#alt-pointer-inset)"
-        >
-          <path
-            d="M6.60095 62.5L32.517 54.5931C34.1999 54.0797 35.3497 52.5268 35.3497 50.7672V25.1127C35.3497 22.9035 37.1406 21.1127 39.3497 21.1127H115.767C117.976 21.1127 119.767 19.3218 119.767 17.1127V6C119.767 3.79086 121.558 2 123.767 2H145.601C147.81 2 149.601 3.79086 149.601 6V116C149.601 118.209 147.81 120 145.601 120H123.767C121.558 120 119.767 118.209 119.767 116V106.342C119.767 104.132 117.976 102.342 115.767 102.342H39.3497C37.1406 102.342 35.3497 100.551 35.3497 98.3415V74.9005C35.3497 73.1754 34.2438 71.6447 32.606 71.1029L6.60095 62.5Z"
-            fill="black"
-            fillOpacity="0.2"
-            stroke="white"
-            strokeWidth="4"
-          />
-        </g>
+        {/* ── Altitude pointer — clean pentagon, left-pointing arrow ── */}
+        <path
+          d={`M${BODY_W},${CENTER_Y - 26} H30 L8,${CENTER_Y} L30,${CENTER_Y + 26} H${BODY_W} Z`}
+          fill="rgba(0,0,0,0.93)"
+          stroke="white"
+          strokeWidth="2"
+        />
 
-        {/* Current altitude text inside pointer */}
+        {/* ── Current altitude text — centered inside pointer box ── */}
         <text
-          x={42}
-          y={CENTER_Y + 10}
+          x={91}
+          y={CENTER_Y + 12}
           fill={PFD.WHITE}
-          fontSize="32"
+          fontSize="28"
           fontFamily={PFD.FONT_GRADUATE}
-          textAnchor="start"
+          textAnchor="middle"
         >
           {displayAlt.toLocaleString()}
         </text>
