@@ -29,91 +29,74 @@ const CARDINALS = [
   { angle: 180, label: 'S', isN: false },
   { angle: 270, label: 'W', isN: false },
 ];
-const INTERCARDINAL_ANGLES = [45, 135, 225, 315];
 
 function MiniCompass({ heading }: { heading: number }) {
-  return (
-    <svg width={100} height={100} viewBox="0 0 100 100" style={{ display: 'block' }}>
-      {/* Background fill */}
-      <circle cx={CX} cy={CY} r={R} fill="rgba(0,0,0,0.5)" />
-      {/* Outer ring */}
-      <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={2} />
+  const TICK_OUTER = R;
+  const TICK_INNER = R - 12; // cardinal tick length: 12px
+  const TICK_INTER = R - 8;  // intercardinal tick length: 8px
+  const LABEL_R   = R - 22; // label position radius
 
-      {/* Rotating card — ticks + labels */}
+  return (
+    <svg width={90} height={90} viewBox="0 0 100 100" style={{ display: 'block' }}>
+      {/* Background fill */}
+      <circle cx={CX} cy={CY} r={R} fill="rgba(0,0,0,0.55)" />
+      {/* Outer ring */}
+      <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} />
+
+      {/* Rotating card — cardinal ticks + labels + intercardinal ticks */}
       <g transform={`rotate(${-heading}, ${CX}, ${CY})`}>
-        {/* Cardinal ticks */}
+        {/* 4 intercardinal ticks only (no minor/10° ticks) */}
+        {[45, 135, 225, 315].map((angle) => {
+          const rad = (angle * Math.PI) / 180;
+          const x1 = CX + TICK_OUTER * Math.sin(rad);
+          const y1 = CY - TICK_OUTER * Math.cos(rad);
+          const x2 = CX + TICK_INTER * Math.sin(rad);
+          const y2 = CY - TICK_INTER * Math.cos(rad);
+          return (
+            <line key={angle} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+          );
+        })}
+
+        {/* 4 cardinal ticks + labels */}
         {CARDINALS.map(({ angle, label, isN }) => {
           const rad = (angle * Math.PI) / 180;
           const sinA = Math.sin(rad);
           const cosA = Math.cos(rad);
-          const x1  = CX + R * sinA;
-          const y1  = CY - R * cosA;
-          const x2  = CX + (R - 8) * sinA;
-          const y2  = CY - (R - 8) * cosA;
-          const lx  = CX + (R - 19) * sinA;
-          const ly  = CY - (R - 19) * cosA;
+          const x1 = CX + TICK_OUTER * sinA;
+          const y1 = CY - TICK_OUTER * cosA;
+          const x2 = CX + TICK_INNER * sinA;
+          const y2 = CY - TICK_INNER * cosA;
+          const lx = CX + LABEL_R * sinA;
+          const ly = CY - LABEL_R * cosA;
           return (
             <g key={angle}>
-              <line
-                x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke={isN ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.5)'}
-                strokeWidth={isN ? 2.5 : 1.5}
-              />
-              <text
-                x={lx} y={ly}
-                textAnchor="middle"
-                dominantBaseline="central"
+              <line x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={isN ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.6)'}
+                strokeWidth={isN ? 2.5 : 2} />
+              <text x={lx} y={ly}
+                textAnchor="middle" dominantBaseline="central"
                 fontFamily={FONT_UI}
-                fontSize={isN ? 14 : 13}
+                fontSize={isN ? 13 : 11}
                 fontWeight={isN ? 700 : 600}
-                fill={isN ? '#22d3ee' : 'rgba(255,255,255,0.75)'}
-              >
+                fill={isN ? '#22d3ee' : 'rgba(255,255,255,0.65)'}>
                 {label}
               </text>
             </g>
           );
         })}
-
-        {/* Intercardinal ticks */}
-        {INTERCARDINAL_ANGLES.map((angle) => {
-          const rad = (angle * Math.PI) / 180;
-          const x1  = CX + R * Math.sin(rad);
-          const y1  = CY - R * Math.cos(rad);
-          const x2  = CX + (R - 4) * Math.sin(rad);
-          const y2  = CY - (R - 4) * Math.cos(rad);
-          return (
-            <line
-              key={angle}
-              x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke="rgba(255,255,255,0.3)"
-              strokeWidth={1}
-            />
-          );
-        })}
       </g>
 
-      {/* Aircraft symbol (fixed) — simple HSI silhouette */}
-      <g stroke="rgba(255,255,255,0.75)" strokeWidth={1.5} fill="none" strokeLinecap="round">
-        {/* Fuselage */}
-        <line x1={CX} y1={CY - 16} x2={CX} y2={CY + 14} />
-        {/* Wings */}
-        <line x1={CX - 16} y1={CY - 2} x2={CX + 16} y2={CY - 2} />
-        {/* Tail */}
-        <line x1={CX - 7} y1={CY + 14} x2={CX + 7} y2={CY + 14} />
+      {/* Aircraft symbol (fixed) */}
+      <g stroke="rgba(255,255,255,0.6)" strokeWidth={1.5} fill="none" strokeLinecap="round">
+        <line x1={CX} y1={CY - 14} x2={CX} y2={CY + 12} />
+        <line x1={CX - 14} y1={CY - 1} x2={CX + 14} y2={CY - 1} />
+        <line x1={CX - 6} y1={CY + 12} x2={CX + 6} y2={CY + 12} />
       </g>
 
-      {/* Dashed center line */}
-      <line
-        x1={CX} y1={CY - R + 12}
-        x2={CX} y2={CY - 18}
-        stroke="rgba(255,255,255,0.2)"
-        strokeWidth={0.5}
-        strokeDasharray="2,2"
-      />
-
-      {/* Lubber line — fixed triangle at 12 o'clock */}
+      {/* Lubber line — fixed cyan triangle at 12 o'clock */}
       <polygon
-        points={`${CX},${CY - R + 1} ${CX - 4},${CY - R + 9} ${CX + 4},${CY - R + 9}`}
+        points={`${CX},${CY - R + 2} ${CX - 4},${CY - R + 10} ${CX + 4},${CY - R + 10}`}
         fill="#22d3ee"
       />
     </svg>

@@ -8,7 +8,7 @@ import { SyntheticVisionBackground } from './SyntheticVisionBackground';
 import { SpeedTape } from './SpeedTape';
 import { AltitudeTape } from './AltitudeTape';
 import { HeadingTape } from './HeadingTape';
-import { TopHeadingArc } from './TopHeadingArc';
+
 import { FlightDirector } from './FlightDirector';
 import { ModeAnnunciations } from './ModeAnnunciations';
 
@@ -62,7 +62,6 @@ export function InteractivePFD() {
       <FlightDirector isDescending={isDescending} />
 
       {/* z-20: Instruments */}
-      <TopHeadingArc />
       <HeadingTape heading={headingValue} />
       <SpeedTape speed={speed} />
       <AltitudeTape
