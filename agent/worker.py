@@ -206,7 +206,11 @@ class ATCAgentWorker:
         """Update STT keyword boosting for current drill."""
         keywords = payload.get("keywords", [])
         self._stt_config.drill_keywords = keywords
+        old_stt = self._stt
         self._stt = create_stt(self._stt_config)
+        # Explicitly close old STT to release Deepgram connections
+        if old_stt is not None and hasattr(old_stt, "aclose"):
+            asyncio.ensure_future(old_stt.aclose())
         logger.info("Updated drill keywords: %d terms", len(keywords))
 
     def _handle_atc_instruction(self, payload: dict) -> None:
@@ -279,7 +283,10 @@ class ATCAgentWorker:
 
         self._expected_readback = expected_readback
         self._stt_config.drill_keywords = keywords
+        old_stt = self._stt
         self._stt = create_stt(self._stt_config)
+        if old_stt is not None and hasattr(old_stt, "aclose"):
+            asyncio.ensure_future(old_stt.aclose())
 
         logger.info("[ESCALATION] Speaking: '%s', keywords=%d", text[:80], len(keywords))
         asyncio.ensure_future(self._speak_atc(text))
@@ -317,16 +324,23 @@ class ATCAgentWorker:
                 return
 
         try:
-            # ── Step 1: Generate TTS audio ────────────────────────
+            # ── Step 1: Generate TTS audio (with timeout) ─────────
             logger.info("[ATC-SPEAK] Requesting TTS for: '%s'", text[:80])
             tts_start = time.time()
             tts_stream = self._tts.synthesize(text)
             audio_frames: list[np.ndarray] = []
 
-            async for event in tts_stream:
-                if event.frame:
-                    frame_data = np.frombuffer(event.frame.data, dtype=np.int16)
-                    audio_frames.append(frame_data)
+            async def _collect_tts_frames():
+                async for event in tts_stream:
+                    if event.frame:
+                        frame_data = np.frombuffer(event.frame.data, dtype=np.int16)
+                        audio_frames.append(frame_data)
+
+            try:
+                await asyncio.wait_for(_collect_tts_frames(), timeout=20.0)
+            except asyncio.TimeoutError:
+                logger.error("[ATC-SPEAK] TTS timed out after 20s — aborting")
+                return
 
             tts_elapsed = time.time() - tts_start
 
@@ -554,8 +568,12 @@ class ATCAgentWorker:
                 samples_per_channel=len(audio),
             )
 
-            # Use the STT recognize method — returns a SpeechEvent
-            event = await self._stt.recognize(frame)
+            # Use the STT recognize method — returns a SpeechEvent (with timeout)
+            try:
+                event = await asyncio.wait_for(self._stt.recognize(frame), timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.error("[STT] recognize() timed out after 15s")
+                return {"text": "", "words": []}
 
             # SpeechEvent stores results in .alternatives (list[SpeechData])
             text = ""
