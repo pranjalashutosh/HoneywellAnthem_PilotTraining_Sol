@@ -50,7 +50,7 @@ ATC drill cycle, data channel messages, PilotPredict flow, assessment pipeline, 
 | `INTERIM_TRANSCRIPT` | Agent → Browser | Live partial STT transcript |
 | `FINAL_TRANSCRIPT` | Agent → Browser | Committed STT transcript with confidence |
 | `ATC_SPEAK_END` | Agent → Browser | TTS playback complete, PTT available |
-| `ASSESSMENT_RESULT` | Agent → Browser | Scored readback + cognitive load + latency |
+| `ASSESSMENT_RESULT` | Agent → Browser | Scored readback + cognitive load + latency. During `atc_instruction` events, triggers readback-gated auto-advance (no manual "Continue" button). |
 | `BASELINE_UPDATE` | Agent → Browser | Updated cognitive load baseline after calibration |
 | `SET_BASELINE` | Browser → Agent | Restore persisted baseline on reconnect (running sums reconstructed) |
 | `ATC_ESCALATION` | Browser → Agent | Escalation text for TTS playback during interactive cockpit events |

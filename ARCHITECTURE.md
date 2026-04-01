@@ -135,6 +135,7 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       ├── lib/
 │       │   ├── supabase.ts         # Supabase client init
 │       │   ├── scoring.ts          # Simplified (server-side primary)
+│       │   ├── cockpit-action-utils.ts # Evaluates CockpitAction against cockpit store state (auto-detection)
 │       │   ├── frequency-utils.ts  # Frequency helpers: action classifier, COM validation, predictive matching
 │       │   ├── flight-plan-utils.ts # Pure math: haversine, bearing, waypoint enrichment, progress computation
 │       │   ├── audio-utils.ts      # Simplified (LiveKit SDK handles audio)

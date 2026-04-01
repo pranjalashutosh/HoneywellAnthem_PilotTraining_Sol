@@ -440,6 +440,127 @@ If any step failed (Edge Function timeout, room not ready, context build error),
 
 ---
 
+## Phase 10: VNAV Escalation & Drill Flow Fixes
+
+### ISS-026: Continue Buttons Disrupting Natural Drill Flow
+
+**Status:** RESOLVED
+**Date:** 2026-03-28
+**Symptom:** During the VNAV Descent Conflict drill, "Continue" buttons appear between every drill event (after ATC readback, after frequency actions). The pilot must click "Continue" to advance, breaking the natural cockpit simulation feel.
+
+**Root Cause:** The drill was designed with manual advancement via Continue buttons at multiple points:
+1. In `InteractiveMFD.tsx` RadiosTab — after ATC voice readback is given, a "Continue" button appeared
+2. In `InteractiveMFD.tsx` RadiosTab — after frequency cockpit_action is completed, a "Continue" button appeared
+3. In `DrillActiveView.tsx` — same Continue button existed for the ATC voice path (though DrillActiveView was NOT mounted via `AmbientCockpitView`, so this was dead code)
+
+**Resolution:**
+1. Removed all Continue buttons from ATC instruction flow in `InteractiveMFD.tsx` RadiosTab
+2. Removed Continue button from frequency action flow — replaced with auto-advance after 1.5s delay showing success/failure feedback
+3. Added `readbackReceived` flag to `scenario-store.ts` — set by `processAssessmentResult()` in `assessment-engine.ts` when `ASSESSMENT_RESULT` arrives during an `atc_instruction` event
+4. Added auto-advance `useEffect` in RadiosTab that fires when `readbackReceived` is true
+5. Converted `handleAdvanceOrComplete` and `handleAcceptContact` to `useCallback` to satisfy hook dependency rules
+6. Removed the `decision_point` event from `descent-conflict.ts` drill definition (was 4 events, now 3: atc_instruction → atc_instruction → interactive_cockpit)
+
+**Files Changed:** `app/src/components/cockpit/InteractiveMFD.tsx`, `app/src/components/drill/DrillActiveView.tsx`, `app/src/stores/scenario-store.ts`, `app/src/services/assessment-engine.ts`, `app/src/data/drills/descent-conflict.ts`
+
+---
+
+### ISS-027: Drill Stuck After Readback — Auto-Advance Never Fires
+
+**Status:** IN PROGRESS
+**Date:** 2026-03-28
+**Symptom:** After removing Continue buttons (ISS-026), the VNAV drill gets permanently stuck after the pilot gives a voice readback. The pilot speaks, the transcript appears (e.g., "okay got you"), but the drill never advances to the next event.
+
+**Screenshot evidence:** Radios tab shows ATC instruction, pilot PLT transcript visible, PTT button available, but no advancement happens.
+
+**Root Cause (multi-layered):**
+
+1. **`DrillActiveView` is never mounted:** The auto-advance `useEffect` was originally added to `DrillActiveView.tsx`, but `DrillActiveView` is only imported by `DrillsTab.tsx` — which is NEVER imported by any other component. It is dead code. The actual ATC UI the pilot interacts with is the RadiosTab inside `InteractiveMFD.tsx`, rendered by `AmbientCockpitView`. So the `DrillActiveView` auto-advance effect never runs.
+
+2. **`ASSESSMENT_RESULT` may never arrive:** The auto-advance mechanism relies on the Python LiveKit agent receiving the pilot's audio, running Deepgram STT + readback scoring, and sending an `ASSESSMENT_RESULT` data channel message. This chain can fail silently if:
+   - The agent is not running or has crashed (numpy import error, venv not activated)
+   - Deepgram STT processing fails
+   - The agent's assessment computation throws an error
+   - The data channel message fails to send
+   When the Continue button existed, it was the manual fallback. Without it, there is no fallback.
+
+3. **Vite HMR failure masked the fix:** Even after adding auto-advance to `InteractiveMFD.tsx` RadiosTab, the browser showed 500 errors (`Failed to load resource: the server responded with a status of 500`) and `TypeError: Importing the module script failed` — Vite's hot module replacement failed to reload the file. The browser was still running the OLD code without any auto-advance logic.
+
+4. **Shared timer ref bug:** When a second auto-advance mechanism (fallback based on `FINAL_TRANSCRIPT`) was added alongside the `ASSESSMENT_RESULT` trigger, both used the same `autoAdvanceTimerRef`. React effect cleanup in the ASSESSMENT_RESULT effect could accidentally clear the fallback timer when dependencies changed, preventing either path from firing.
+
+**Steps Taken So Far:**
+
+| Step | Action | Result |
+|------|--------|--------|
+| 1 | Removed Continue from DrillActiveView.tsx ATC voice path | No effect — DrillActiveView not mounted |
+| 2 | Discovered RadiosTab in InteractiveMFD.tsx was the actual rendering path | Identified correct file to fix |
+| 3 | Removed Continue from InteractiveMFD.tsx RadiosTab, added auto-advance via `readbackReceived` | Fix not applied — Vite HMR failed (500 error) |
+| 4 | Killed dev server, cleared Vite cache, restarted | HMR now works |
+| 5 | Added fallback auto-advance using `FINAL_TRANSCRIPT` (pilot transcript) detection after PTT release — 5s timeout | Shared timer ref bug: ASSESSMENT_RESULT effect cleanup clears fallback timer |
+| 6 | Split into separate timer refs (`autoAdvanceTimerRef` + `fallbackTimerRef`), added `advancedRef` double-advance guard | tsc/lint/build all pass, but NOT YET TESTED by user |
+
+**Current State of Fix (untested):**
+
+Two auto-advance paths now exist in RadiosTab:
+- **Fast path (1.5s):** `ASSESSMENT_RESULT` from agent → `readbackReceived=true` → advance after 1.5s
+- **Fallback path (5s):** Pilot `FINAL_TRANSCRIPT` appears in `transcriptHistory` + PTT released → advance after 5s if no ASSESSMENT_RESULT
+
+Both paths use `advancedRef` guard to prevent double-advance.
+
+Event reset logic clears all timers and snapshots transcript count when `currentEventIndex` changes.
+
+**What Still Needs Verification:**
+1. Does the fallback auto-advance actually fire in the browser after a hard refresh?
+2. Does the drill successfully advance through all 3 events (ATC → ATC → interactive_cockpit)?
+3. Does the interactive cockpit phase start correctly after the second ATC readback?
+4. Edge case: what happens if pilot speaks during interim transcripts but no FINAL_TRANSCRIPT commits?
+
+**Key Files:**
+- `app/src/components/cockpit/InteractiveMFD.tsx` — RadiosTab with auto-advance logic (lines 660-720)
+- `app/src/services/assessment-engine.ts` — sets `readbackReceived` on ASSESSMENT_RESULT (line 137-142)
+- `app/src/stores/scenario-store.ts` — `readbackReceived` state + `setReadbackReceived` action
+- `app/src/hooks/useLiveKit.ts` — data channel handler dispatches ASSESSMENT_RESULT to processAssessmentResult
+- `app/src/stores/voice-store.ts` — `transcriptHistory` used for fallback detection
+- `app/src/components/drill/DrillActiveView.tsx` — has auto-advance logic but IS NOT MOUNTED (dead code)
+- `app/src/components/drill/DrillsTab.tsx` — only consumer of DrillActiveView, itself never imported
+
+---
+
+### ISS-028: Cockpit State Not Applied on Drill Start
+
+**Status:** RESOLVED
+**Date:** 2026-03-30
+**Symptom:** Starting the VNAV Descent Conflict drill leaves the cockpit in NAV/36000/280 instead of configuring to VNAV/14000/157 as the drill's initialState specifies.
+
+**Root Cause:** Both `DrillBriefing.tsx` and `InteractiveMFD.tsx` TrainingSection called `useScenarioStore.startDrill()` directly, which only sets the drill phase and start time. The correct function `scenario-runner.startDrill(drillId)` — which calls `cockpit.applyCockpitState(drill.initialState)` — was never invoked by either UI component.
+
+**Resolution:**
+1. `DrillBriefing.tsx`: Changed from `useScenarioStore((s) => s.startDrill)` to `useDrillRunner().startDrill`, wired button to call `runnerStart(drill.id)`
+2. `InteractiveMFD.tsx`: Added `import { startDrill as runnerStartDrill } from '@/services/scenario-runner'`, changed `onStart` from `selectDrill(drill.id)` to `runnerStartDrill(drill.id)`
+
+**Files Changed:** `app/src/components/drill/DrillBriefing.tsx`, `app/src/components/cockpit/InteractiveMFD.tsx`
+
+---
+
+### ISS-029: Redundant "Begin Drill" Button in MFD Flow
+
+**Status:** RESOLVED
+**Date:** 2026-03-30
+**Symptom:** After clicking "Start Drill" and selecting a drill from the list, the MFD showed a briefing panel with another "Begin Drill" button. Users had to click Begin Drill twice.
+
+**Root Cause:** The old flow was: `onStart` → `selectDrill(drill.id)` → sets phase to 'briefing' → MFD renders briefing panel → user clicks "Begin Drill" again. The briefing panel was a redundant intermediate step in the cockpit MFD context.
+
+**Resolution:**
+1. Changed MFD drill list `onStart` to call `runnerStartDrill(drill.id)` directly — drills now start immediately when selected from the list
+2. Removed the entire MFD briefing panel (`if (phase === 'briefing' && activeDrill)` block, ~48 lines)
+3. Cleaned up unused `selectDrill` and `resetDrill` store subscriptions from TrainingSection
+
+Note: The standalone `DrillBriefing.tsx` component (used by `DrillsTab.tsx`) is preserved for the non-cockpit drill view.
+
+**Files Changed:** `app/src/components/cockpit/InteractiveMFD.tsx`
+
+---
+
 ## Open / Known Limitations
 
 ### LIM-001: Agent Requires Python Virtual Environment

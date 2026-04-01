@@ -4,10 +4,30 @@ Domain-sliced stores with surgical re-renders for cockpit panels.
 
 ---
 
+## Core Philosophy: The Hostile UI Store Machine
+
+### 1. The "Dumb" UI (Legacy Approach)
+
+Standard web applications are obedient. If a user types "8000," the app updates the state to "8000." A legacy cockpit prototype is obedient—the altitude tape is just a fancy slider. This is terrible for aviation training because airplanes are not obedient.
+
+### 2. The "Hostile" UI (Our Goal)
+
+In aviation, "hostile" means unforgiving. A hostile UI does not trust the user. It treats user input as a **request**, not a command. When a pilot turns a knob, they are asking the computer: "Can I descend to 8,000?" The computer checks its rulebook (AFDS constraints, FMS path) and can outright refuse. If it refuses, it pushes back—the knob stops scrolling, the UI flashes a warning.
+
+### 3. Stateful Constraints
+
+The altitude knob's behavior depends entirely on the active AFDS mode.
+
+- **State A (FLCH Mode):** Pilot manually commands descent. UI is obedient. Allows scroll to 8000.
+- **State B (VNAV Mode):** FMS flies a 3D path with a hard floor at 11,000. UI becomes hostile. Blocks pilot from dialing below 11,000 and flashes a conflict warning.
+
+---
+
 ## Store Slices
 
 ```typescript
 // cockpit-store.ts — Aircraft and cockpit instrument state
+// Implements "Hostile UI" constraint enforcement.
 interface CockpitStore {
   flightPlan: Waypoint[];
   activeFrequency: Frequency;
@@ -22,21 +42,32 @@ interface CockpitStore {
   vnavConstraint: number;                   // VNAV altitude floor (blocks descent in VNAV mode)
   autopilot: boolean;                       // AP engaged/disengaged
   autoThrottle: boolean;                    // Auto-throttle engaged/disengaged
+
+  // Hostile UI — constraint violation tracking
+  lastConstraintViolation: ConstraintViolation | null;
+  constraintViolationCount: number;
+
   setFrequency: (freq: Frequency, slot: 'active' | 'standby') => void;
   swapFrequencies: () => void;
   updateWaypoint: (index: number, waypoint: Partial<Waypoint>) => void;
-  setMode: (mode: CockpitMode) => void;
+  setMode: (mode: CockpitMode) => void;        // Clears constraint violations on mode switch
   setAltitude: (alt: number) => void;
   setHeading: (hdg: number) => void;
   setSpeed: (spd: number) => void;
-  setDesiredAltitude: (alt: number) => void;
-  adjustDesiredAltitude: (direction: 'up' | 'down', step?: number) => void;
+  requestAltitudeChange: (alt: number) => void; // Hostile: rejects + snaps to floor in VNAV mode
+  adjustDesiredAltitude: (direction: 'up' | 'down', step?: number) => void; // Hostile: clamps to floor
   setVnavConstraint: (alt: number) => void;
   setAutopilot: (on: boolean) => void;
   setAutoThrottle: (on: boolean) => void;
   setActiveRouteId: (id: string) => void;
   setSelectedWaypointId: (id: string | null) => void;
+  clearConstraintViolation: () => void;
   loadFlightPlan: (plan: Waypoint[]) => void;
+
+  // Atomic initial conditions (bypass hostile constraints — authored data is trusted)
+  applyCockpitState: (state: CockpitState) => void;
+  applyCockpitOverrides: (overrides: Partial<CockpitState>) => void;
+
   reset: () => void;
 }
 

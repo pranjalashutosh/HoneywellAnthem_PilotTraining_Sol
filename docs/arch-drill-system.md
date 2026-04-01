@@ -57,6 +57,10 @@ interface PredictSuggestionEvent {
   context: string;
 }
 
+// Cockpit-aware: auto-detects action via cockpit store subscription.
+// Pilot performs the action on the actual cockpit controls; the system
+// verifies via evaluateCockpitAction(). Manual fallback button available.
+// TouchScore.cockpitVerified distinguishes auto-detected vs fallback.
 interface CockpitActionEvent {
   type: 'cockpit_action';
   instruction: string;
@@ -93,20 +97,59 @@ interface InteractiveCockpitScore {
 }
 ```
 
+---
+
+## Drill-Cockpit Coupling
+
+### Initial Condition System
+
+Drills configure cockpit state atomically via `applyCockpitState(drill.initialState)` in `scenario-runner.startDrill()`. This single call replaces all individual setter calls and **bypasses hostile constraint validation** (authored data is trusted).
+
+Per-event overrides (for `interactive_cockpit` events) use `applyCockpitOverrides(event.initialCockpitOverrides)`, which also bypasses constraints via Zustand shallow merge.
+
+### Hostile UI Constraint Enforcement
+
+The cockpit store validates pilot input against active constraints:
+
+- **`requestAltitudeChange(alt)`**: In VNAV mode with `vnavConstraint > 0`, rejects altitude below the floor. Snaps `desiredAltitude` to the constraint value. Populates `lastConstraintViolation`.
+- **`adjustDesiredAltitude(dir)`**: Clamps to constraint floor (snap-back). Emits violation when already at floor.
+- **`setMode(mode)`**: Clears `lastConstraintViolation` on mode switch (pilot resolved the conflict).
+
+UI components subscribe to `lastConstraintViolation` for visual feedback:
+- **AutopilotControlBar**: Amber ALT readout flash, VNAV constraint dot
+- **AltitudeTape**: Constraint line flash + "FLOOR" label for 2s
+- **ModeAnnunciations**: "VNAV PATH REJECT" warning badge
+
+### Cockpit-Aware Action Events
+
+`cockpit_action` events auto-detect pilot actions via cockpit store subscription using `evaluateCockpitAction()` (`lib/cockpit-action-utils.ts`). When the expected action is detected in the store, the event auto-advances. Manual "Action Complete" fallback remains. `TouchScore.cockpitVerified` distinguishes auto-detected vs fallback.
+
+### Drill Start Flow
+
+Two paths start a drill, both routed through `scenario-runner.startDrill(drillId)`:
+
+1. **MFD TrainingSection** (cockpit view): Pilot clicks "Start Drill" → selects from drill list → `runnerStartDrill(drill.id)` fires immediately. No briefing panel — cockpit state applies instantly and drill begins.
+2. **DrillsTab** (standalone view): Pilot selects drill → briefing screen → clicks "Begin Drill" → `useDrillRunner().startDrill(drill.id)`. Full briefing shown before start.
+
+Both paths call `scenario-runner.startDrill()` which: selects the drill, applies `cockpit.applyCockpitState(drill.initialState)`, initializes assessment metrics, clears voice transcripts, then starts the drill.
+
+---
+
 ### Example Drill: VNAV Descent Conflict
 
-A unified 4-event scenario where a pilot at 14,000ft in VNAV mode has an 11,000ft VNAV constraint blocking descent to 8,000ft. Pilot must recognize the constraint, decide to override, confirm with ATC, then physically switch modes and set altitude on the interactive cockpit.
+A 3-event scenario where a pilot at 14,000ft in VNAV mode has an 11,000ft VNAV constraint blocking descent to 8,000ft. Pilot must read back ATC instructions, then physically recognize the VNAV constraint, switch to FLC mode, and set altitude on the interactive cockpit.
+
+ATC instruction events use **readback-gated auto-advance**: the drill does not advance until the system receives and scores the pilot's voice readback (via `ASSESSMENT_RESULT`). There is no manual "Continue" button — the flow is fully voice-driven.
 
 ```typescript
 const descentConflict: DrillDefinition = {
   id: 'descent-conflict',
   title: 'VNAV Descent Conflict',
   difficulty: 'intermediate',
-  competencies: ['COM', 'SAW', 'KNO', 'PSD', 'FPM'],
+  competencies: ['COM', 'FPM'],
   events: [
-    { type: 'atc_instruction', ... },           // "Descend and maintain 8,000"
-    { type: 'decision_point', ... },             // Recognize VNAV constraint
-    { type: 'atc_instruction', ... },            // "Confirm descending to 8,000"
+    { type: 'atc_instruction', ... },           // "Descend and maintain 8,000" → readback → auto-advance
+    { type: 'atc_instruction', ... },            // "Confirm descending to 8,000" → readback → auto-advance
     {
       type: 'interactive_cockpit',
       successConditions: [
