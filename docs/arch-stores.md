@@ -39,6 +39,8 @@ interface CockpitStore {
   activeRouteId: string;                    // Selected route in registry (default: 'kteb-kpbi')
   selectedWaypointId: string | null;        // Syncs waypoint selection between map and flight plan
   desiredAltitude: number;                  // Target altitude for autopilot (MCP altitude window)
+  desiredSpeed: number;                     // Target speed for auto-throttle (default 280)
+  selectedHeading: number;                  // Selected heading bug (default 360)
   vnavConstraint: number;                   // VNAV altitude floor (blocks descent in VNAV mode)
   autopilot: boolean;                       // AP engaged/disengaged
   autoThrottle: boolean;                    // Auto-throttle engaged/disengaged
@@ -56,6 +58,10 @@ interface CockpitStore {
   setSpeed: (spd: number) => void;
   requestAltitudeChange: (alt: number) => void; // Hostile: rejects + snaps to floor in VNAV mode
   adjustDesiredAltitude: (direction: 'up' | 'down', step?: number) => void; // Hostile: clamps to floor
+  setDesiredSpeed: (spd: number) => void;       // Clamp 0-500
+  adjustDesiredSpeed: (direction: 'up' | 'down', step?: number) => void; // Step default 5 kts
+  setSelectedHeading: (hdg: number) => void;    // Normalize 0-360
+  adjustSelectedHeading: (direction: 'left' | 'right', step?: number) => void; // Step default 1 deg, wraps
   setVnavConstraint: (alt: number) => void;
   setAutopilot: (on: boolean) => void;
   setAutoThrottle: (on: boolean) => void;

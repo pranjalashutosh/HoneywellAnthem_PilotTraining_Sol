@@ -183,11 +183,10 @@ InteractiveCockpitView (top-level container — for interactive_cockpit events o
 ### Data Flow
 
 1. **On mount:** `InteractiveCockpitView` applies `initialCockpitOverrides` to `cockpit-store` (once, via ref guard)
-2. **Altitude simulation:** `useAltitudeSimulation` runs a 500ms interval, moving `altitude` toward `desiredAltitude` at mode-dependent rates:
-   - VNAV: 100ft/tick (respects `vnavConstraint` — won't descend below constraint altitude)
-   - FLCH: 200ft/tick (overrides constraint)
-   - VS: 150ft/tick (overrides constraint)
-   - Other modes (NAV, ALT, APR, HDG): 100ft/tick default rate
+2. **Flight simulation:** `flight-simulation.ts` is a headless, module-scoped service running a 50ms tick (~20fps). `useAltitudeSimulation` is a thin lifecycle bridge calling `startSimulation()`/`stopSimulation()`. The consolidated `tick()` handles:
+   - **Altitude convergence** — VNAV: 200ft/s, FLCH: 400ft/s, VS: 300ft/s, default: 200ft/s. VNAV respects `vnavConstraint` floor.
+   - **Speed convergence** — 4 kts/s, gated by `autoThrottle === true`. Moves `speed` toward `desiredSpeed`.
+   - **Heading convergence** — 4 deg/s, gated by `selectedMode === 'HDG'`. Uses shortest-arc turning with 0/360 wrap.
 3. **Action tracking:** `useInteractiveCockpitTracker` subscribes to cockpit-store, records mode/altitude changes with timestamps, evaluates `CockpitSuccessCondition`s on every change
 4. **Escalation:** If pilot hasn't met all conditions within `escalationDelaySeconds`, an ATC escalation message fires
 4b. **Escalation voice:** If escalation fires and LiveKit is connected, `ATC_ESCALATION` message triggers agent TTS playback of the escalation prompt. Pilot may optionally read back (scored as normal readback).
@@ -197,6 +196,8 @@ InteractiveCockpitView (top-level container — for interactive_cockpit events o
 
 Fields added for interactive cockpit support:
 - `desiredAltitude: number` — Target altitude set by pilot (MCP altitude window)
+- `desiredSpeed: number` — Target speed for auto-throttle (default 280)
+- `selectedHeading: number` — Selected heading bug (default 360)
 - `vnavConstraint: number` — VNAV altitude floor (blocks descent in VNAV mode)
 - `autopilot: boolean` — AP engaged/disengaged
 - `autoThrottle: boolean` — Auto-throttle engaged/disengaged

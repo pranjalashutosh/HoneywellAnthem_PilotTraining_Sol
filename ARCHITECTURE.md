@@ -147,6 +147,7 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   ├── assessment-engine.ts # Simplified — heavy lifting in Python agent
 │       │   ├── scenario-runner.ts  # Drill lifecycle manager
 │       │   ├── pilot-predict.ts    # Predictive input suggestion logic
+│       │   ├── flight-simulation.ts # Headless flight simulation engine (module-scoped, 50ms tick)
 │       │   └── api-client.ts       # Supabase SDK calls instead of fetch()
 │       ├── hooks/
 │       │   ├── useLiveKit.ts       # Room connection, track subscription
@@ -154,7 +155,8 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   ├── useDrillRunner.ts   # Drill lifecycle orchestration
 │       │   ├── useTimer.ts         # Countdown / elapsed timer
 │       │   ├── useAudioLevel.ts    # Real-time mic RMS via Web Audio API (ref-based, no re-renders)
-│       │   ├── useAltitudeSimulation.ts  # Mode-dependent altitude animation (VNAV/FLCH/VS rates)
+│       │   ├── useAltitudeSimulation.ts  # Thin lifecycle bridge to headless flight-simulation service
+│       │   ├── useBugDrag.ts       # Pointer-event drag handler for PFD bug markers (speed/heading)
 │       │   └── useInteractiveCockpitTracker.ts  # Action tracking, condition evaluation, escalation timer
 │       ├── components/
 │       │   ├── layout/             # CockpitShell, TopNavBar (deprecated), StatusBar
