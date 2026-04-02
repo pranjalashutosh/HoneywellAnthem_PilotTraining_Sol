@@ -10,6 +10,7 @@ import time
 
 import numpy as np
 from livekit import agents, rtc
+from livekit.agents.types import NOT_GIVEN
 
 from .assessment import (
     CognitiveLoadBaseline,
@@ -424,10 +425,21 @@ class ATCAgentWorker:
             audio = np.concatenate(self._audio_buffer)
             duration_ms = len(audio) / SAMPLE_RATE * 1000
 
+            # 🔴 [AUDIO_BUFFER] Diagnostics — what are we feeding STT?
+            rms = float(np.sqrt(np.mean(audio.astype(np.float32) ** 2)))
+            peak = int(np.max(np.abs(audio)))
+            print(f"🔴 [AUDIO_BUFFER] frames={len(self._audio_buffer)} total_samples={len(audio)} duration_ms={duration_ms:.0f} rms={rms:.1f} peak={peak} dtype={audio.dtype}", flush=True)
+
             # Run STT
             stt_result = await self._run_stt(audio)
             transcript = stt_result.get("text", "")
             words = stt_result.get("words", [])
+
+            # 🔴 [STT_RESULT] Raw STT output before confidence extraction
+            print(f"🔴 [STT_RESULT] transcript='{transcript}' word_count={len(words)}", flush=True)
+            for i, w in enumerate(words):
+                print(f"   🔴 [STT_WORD {i}] word='{w.get('word','')}' conf={w.get('confidence',0):.4f} start={w.get('start',0):.3f} end={w.get('end',0):.3f}", flush=True)
+
             word_confidences = extract_word_confidences(words)
             word_count = len(transcript.split()) if transcript else 0
 
@@ -440,6 +452,10 @@ class ATCAgentWorker:
                 if word_confidences
                 else 0.0
             )
+
+            # 🟢 [CONFIDENCE_SUMMARY] Mean confidence being sent to browser
+            print(f"🟢 [CONFIDENCE_SUMMARY] mean_conf={mean_conf:.4f} word_count={len(word_confidences)} expected_readback='{self._expected_readback[:80] if self._expected_readback else 'NONE'}'", flush=True)
+
             await self._send_message(
                 MSG_FINAL_TRANSCRIPT,
                 {
@@ -568,12 +584,19 @@ class ATCAgentWorker:
                 samples_per_channel=len(audio),
             )
 
+            # 🟡 [_run_stt] entered — frame details
+            print(f"🟡 [_run_stt] samples={len(audio)} sample_rate={SAMPLE_RATE} duration_s={len(audio)/SAMPLE_RATE:.2f} frame_bytes={len(frame.data)}", flush=True)
+
             # Use the STT recognize method — returns a SpeechEvent (with timeout)
             try:
                 event = await asyncio.wait_for(self._stt.recognize(frame), timeout=15.0)
             except asyncio.TimeoutError:
                 logger.error("[STT] recognize() timed out after 15s")
+                print("🔴 [_run_stt] TIMEOUT after 15s", flush=True)
                 return {"text": "", "words": []}
+
+            # 🟣 [DEEPGRAM_RESPONSE] Raw event inspection
+            print(f"🟣 [DEEPGRAM_RESPONSE] event_type={type(event).__name__} has_alternatives={bool(event and event.alternatives)} alt_count={len(event.alternatives) if event and event.alternatives else 0}", flush=True)
 
             # SpeechEvent stores results in .alternatives (list[SpeechData])
             text = ""
@@ -581,12 +604,20 @@ class ATCAgentWorker:
             if event and event.alternatives:
                 best = event.alternatives[0]
                 text = best.text
+
+                # 🟣 [DEEPGRAM_BEST_ALT] Best alternative details
+                print(f"🟣 [DEEPGRAM_BEST_ALT] text='{text}' word_count={len(best.words) if best.words else 0}", flush=True)
+
                 if best.words:
                     for w in best.words:
-                        # TimedString attrs may be NOT_GIVEN (falsy sentinel)
-                        conf = w.confidence if w.confidence else 0.0
-                        start = w.start_time if w.start_time else 0.0
-                        end = w.end_time if w.end_time else 0.0
+                        # 🔵 [WORD_OBJ] Inspect raw SDK word object
+                        print(f"🔵 [WORD_OBJ] type={type(w).__name__} str(w)='{str(w)}' raw_conf={w.confidence!r}", flush=True)
+
+                        # NOT_GIVEN is a falsy sentinel — use `is not NOT_GIVEN` to avoid
+                        # swallowing real 0.0 values or treating NOT_GIVEN as a float
+                        conf = float(w.confidence) if w.confidence is not NOT_GIVEN else 0.0
+                        start = float(w.start_time) if w.start_time is not NOT_GIVEN else 0.0
+                        end = float(w.end_time) if w.end_time is not NOT_GIVEN else 0.0
                         words.append({
                             "word": str(w),
                             "confidence": conf,
@@ -594,10 +625,14 @@ class ATCAgentWorker:
                             "end": end,
                         })
 
+            # 🟢 [_run_stt] returning
+            print(f"🟢 [_run_stt] text='{text}' words_parsed={len(words)}", flush=True)
             return {"text": text, "words": words}
 
         except Exception:
             logger.exception("STT error")
+            print(f"🔴 [_run_stt] EXCEPTION", flush=True)
+            import traceback; traceback.print_exc()
             return {"text": "", "words": []}
 
     def _detect_speech_onset(self, audio: np.ndarray) -> float:
@@ -653,11 +688,22 @@ class ATCAgentWorker:
             return
 
         logger.info("Audio frame consumer started")
+        _frame_count = 0
+        _ptt_frame_count = 0
         async for event in self._audio_stream:
+            _frame_count += 1
+            if _frame_count == 1:
+                # 🔵 [AUDIO_STREAM] First frame details
+                print(f"🔵 [AUDIO_STREAM] first_frame: sample_rate={event.frame.sample_rate} channels={event.frame.num_channels} samples={event.frame.samples_per_channel} bytes={len(event.frame.data)}", flush=True)
             if not self._ptt_active:
                 continue
+            _ptt_frame_count += 1
             audio_data = np.frombuffer(event.frame.data, dtype=np.int16)
             self._audio_buffer.append(audio_data)
+            if _ptt_frame_count % 50 == 1:
+                # 🔵 [PTT_CAPTURE] Every 50th frame during PTT (~1s at 20ms frames)
+                rms = float(np.sqrt(np.mean(audio_data.astype(np.float32) ** 2)))
+                print(f"🔵 [PTT_CAPTURE] ptt_frame={_ptt_frame_count} samples={len(audio_data)} rms={rms:.1f} peak={int(np.max(np.abs(audio_data)))}", flush=True)
 
 
 # ─── Agent entrypoint ──────────────────────────────────────

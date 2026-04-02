@@ -225,12 +225,19 @@ def score_readback(
     )
     low_conf_pct = low_conf_count / max(1, len(word_confidences))
 
+    # 🔴 [SCORE_READBACK] Confidence analysis
+    print(f"🔴 [SCORE_READBACK] expected='{expected}' transcript='{transcript}'", flush=True)
+    print(f"🔴 [SCORE_READBACK] mean_conf={float(mean_conf):.4f} low_conf_count={low_conf_count}/{len(word_confidences)} low_conf_pct={low_conf_pct:.3f}", flush=True)
+    print(f"🔴 [SCORE_READBACK] thresholds: abstain_mean={CONFIDENCE_ABSTAIN_MEAN} abstain_low_pct={CONFIDENCE_ABSTAIN_LOW_PCT} high={CONFIDENCE_HIGH}", flush=True)
+
     if mean_conf < CONFIDENCE_ABSTAIN_MEAN or low_conf_pct > CONFIDENCE_ABSTAIN_LOW_PCT:
         scoring_basis = "abstained"
     elif mean_conf < CONFIDENCE_HIGH:
         scoring_basis = "uncertain"
     else:
         scoring_basis = "confident"
+
+    print(f"🟢 [SCORE_READBACK] scoring_basis='{scoring_basis}'", flush=True)
 
     # Raw LCS-based accuracy
     lcs_len = _lcs_length(expected_tokens, actual_tokens)
