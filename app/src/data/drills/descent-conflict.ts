@@ -12,7 +12,7 @@ export const descentConflict: DrillDefinition = {
     'ATC clears descent to 8,000 but VNAV PATH is constrained at 11,000. ' +
     'Tests automation awareness, mode selection, and communication.',
   duration: 300,
-  difficulty: 'intermediate',
+  difficulty: 'beginner',
   competencies: ['COM', 'FPM'],
   flightPlan: 'kjfk-kbos',
   initialState: {

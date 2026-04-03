@@ -20,6 +20,7 @@ import { isFrequencyAction, frequencyMatchesExpected } from '@/lib/frequency-uti
 import { MapDisplay } from '@/components/map/MapDisplay';
 import { FlightPlanTab } from '@/components/cockpit/FlightPlanTab';
 import type { DrillDefinition, ATCInstructionEvent, CockpitActionEvent } from '@/types';
+import { PHASE_II_DRILL_IDS } from '@/data/drills';
 
 
 interface InteractiveMFDProps {
@@ -478,21 +479,25 @@ function TrainingSection({
               </div>
             ) : (
               <div className="space-y-1.5 max-h-[400px] overflow-auto">
-                {drills.map((drill) => (
-                  <DrillListItem
-                    key={drill.id}
-                    drill={drill}
-                    isExpanded={expandedDrillId === drill.id}
-                    onToggle={() =>
-                      setExpandedDrillId(expandedDrillId === drill.id ? null : drill.id)
-                    }
-                    onStart={() => {
-                      runnerStartDrill(drill.id);
-                      setShowDrillList(false);
-                      setExpandedDrillId(null);
-                    }}
-                  />
-                ))}
+                {drills.map((drill) => {
+                  const isPhaseII = PHASE_II_DRILL_IDS.has(drill.id);
+                  return (
+                    <DrillListItem
+                      key={drill.id}
+                      drill={drill}
+                      isExpanded={expandedDrillId === drill.id}
+                      disabled={isPhaseII}
+                      onToggle={() =>
+                        setExpandedDrillId(expandedDrillId === drill.id ? null : drill.id)
+                      }
+                      onStart={() => {
+                        runnerStartDrill(drill.id);
+                        setShowDrillList(false);
+                        setExpandedDrillId(null);
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -544,11 +549,13 @@ function TrainingSection({
 function DrillListItem({
   drill,
   isExpanded,
+  disabled,
   onToggle,
   onStart,
 }: {
   drill: DrillDefinition;
   isExpanded: boolean;
+  disabled?: boolean;
   onToggle: () => void;
   onStart: () => void;
 }) {
@@ -556,7 +563,11 @@ function DrillListItem({
   return (
     <div
       className="rounded-lg overflow-hidden transition-colors"
-      style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}
+      style={{
+        border: disabled ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(255,255,255,0.02)',
+        opacity: disabled ? 0.45 : 1,
+      }}
     >
       <button
         onClick={onToggle}
@@ -566,21 +577,39 @@ function DrillListItem({
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
       >
         <span className="font-graduate font-semibold truncate" style={{ fontSize: 12, color: '#e0e8ec' }}>{drill.title}</span>
-        <span
-          className="font-graduate font-bold uppercase shrink-0 ml-2"
-          style={{
-            fontSize: 9,
-            padding: '2px 7px',
-            borderRadius: 4,
-            border: `1px solid ${diffColors?.border ?? 'rgba(255,255,255,0.2)'}`,
-            color: diffColors?.color ?? 'rgba(255,255,255,0.5)',
-            background: diffColors?.bg ?? 'transparent',
-            minWidth: 64,
-            textAlign: 'center',
-          }}
-        >
-          {drill.difficulty}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {disabled && (
+            <span
+              className="font-graduate font-bold uppercase"
+              style={{
+                fontSize: 8,
+                padding: '2px 6px',
+                borderRadius: 4,
+                border: '1px solid rgba(139,92,246,0.4)',
+                color: 'rgba(167,139,250,0.9)',
+                background: 'rgba(139,92,246,0.1)',
+                letterSpacing: '0.05em',
+              }}
+            >
+              PHASE II
+            </span>
+          )}
+          <span
+            className="font-graduate font-bold uppercase"
+            style={{
+              fontSize: 9,
+              padding: '2px 7px',
+              borderRadius: 4,
+              border: `1px solid ${diffColors?.border ?? 'rgba(255,255,255,0.2)'}`,
+              color: diffColors?.color ?? 'rgba(255,255,255,0.5)',
+              background: diffColors?.bg ?? 'transparent',
+              minWidth: 64,
+              textAlign: 'center',
+            }}
+          >
+            {drill.difficulty}
+          </span>
+        </div>
       </button>
 
       {isExpanded && (
@@ -611,22 +640,38 @@ function DrillListItem({
             <span>{drill.events.length} events</span>
             <span>{Math.ceil(drill.duration / 60)} min</span>
           </div>
-          <button
-            onClick={onStart}
-            className="w-full font-graduate font-bold transition-all min-h-[40px]"
-            style={{
-              borderRadius: 6,
-              background: '#0d7377',
-              border: '1px solid rgba(13,115,119,0.7)',
-              color: '#fff',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0f8b8f'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0d7377'; }}
-          >
-            Begin Drill
-          </button>
+          {disabled ? (
+            <div
+              className="w-full font-graduate font-bold text-center min-h-[40px] flex items-center justify-center"
+              style={{
+                borderRadius: 6,
+                background: 'rgba(139,92,246,0.08)',
+                border: '1px solid rgba(139,92,246,0.25)',
+                color: 'rgba(167,139,250,0.7)',
+                fontSize: 11,
+                letterSpacing: '0.04em',
+              }}
+            >
+              Coming in Phase II
+            </div>
+          ) : (
+            <button
+              onClick={onStart}
+              className="w-full font-graduate font-bold transition-all min-h-[40px]"
+              style={{
+                borderRadius: 6,
+                background: '#0d7377',
+                border: '1px solid rgba(13,115,119,0.7)',
+                color: '#fff',
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0f8b8f'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0d7377'; }}
+            >
+              Begin Drill
+            </button>
+          )}
         </div>
       )}
     </div>

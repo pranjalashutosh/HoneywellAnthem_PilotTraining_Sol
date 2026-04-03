@@ -2,6 +2,7 @@
 
 import { useScenarioStore } from '@/stores/scenario-store';
 import { DrillCard } from './DrillCard';
+import { PHASE_II_DRILL_IDS } from '@/data/drills';
 
 export function DrillSelector() {
   const drills = useScenarioStore((s) => s.availableDrills);
@@ -22,7 +23,12 @@ export function DrillSelector() {
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {drills.map((drill) => (
-          <DrillCard key={drill.id} drill={drill} onSelect={selectDrill} />
+          <DrillCard
+            key={drill.id}
+            drill={drill}
+            disabled={PHASE_II_DRILL_IDS.has(drill.id)}
+            onSelect={selectDrill}
+          />
         ))}
       </div>
     </div>

@@ -17,6 +17,15 @@ export const allDrills: DrillDefinition[] = [
   commsHandoff,
 ];
 
+/** Drill IDs gated behind Phase II — visible but not executable. */
+export const PHASE_II_DRILL_IDS: ReadonlySet<string> = new Set([
+  'weather-diversion',
+  'predict-wrong-freq',
+  'runway-change',
+  'holding-pattern',
+  'comms-handoff',
+]);
+
 export {
   descentConflict,
   weatherDiversion,

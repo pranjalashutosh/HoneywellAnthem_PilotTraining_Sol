@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useScenarioStore } from '@/stores/scenario-store';
 import { AnthemButton } from '@/components/shared/AnthemButton';
+import { PHASE_II_DRILL_IDS } from '@/data/drills';
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   beginner: 'border-green-500 text-green-400 bg-green-500/10',
@@ -52,7 +53,7 @@ export function DrillDropdownSelector() {
         >
           {drills.map((drill) => (
             <option key={drill.id} value={drill.id}>
-              {drill.title}
+              {drill.title}{PHASE_II_DRILL_IDS.has(drill.id) ? ' (Phase II)' : ''}
             </option>
           ))}
         </select>
@@ -71,11 +72,18 @@ export function DrillDropdownSelector() {
                 {selectedDrill.description}
               </p>
             </div>
-            <span
-              className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase ${DIFFICULTY_COLORS[selectedDrill.difficulty] ?? ''}`}
-            >
-              {selectedDrill.difficulty}
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {PHASE_II_DRILL_IDS.has(selectedDrill.id) && (
+                <span className="rounded border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[9px] font-bold uppercase text-violet-400/90 tracking-wide">
+                  PHASE II
+                </span>
+              )}
+              <span
+                className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase ${DIFFICULTY_COLORS[selectedDrill.difficulty] ?? ''}`}
+              >
+                {selectedDrill.difficulty}
+              </span>
+            </div>
           </div>
 
           {/* Meta row */}
@@ -128,13 +136,25 @@ export function DrillDropdownSelector() {
 
           {/* Start button */}
           <div className="mt-auto">
-            <AnthemButton
-              variant="primary"
-              className="w-full"
-              onClick={() => selectDrill(selectedDrill.id)}
-            >
-              Start Drill
-            </AnthemButton>
+            {PHASE_II_DRILL_IDS.has(selectedDrill.id) ? (
+              <div className="w-full text-center rounded-lg py-3 text-sm font-semibold tracking-wide"
+                style={{
+                  background: 'rgba(139,92,246,0.08)',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  color: 'rgba(167,139,250,0.7)',
+                }}
+              >
+                Coming in Phase II
+              </div>
+            ) : (
+              <AnthemButton
+                variant="primary"
+                className="w-full"
+                onClick={() => selectDrill(selectedDrill.id)}
+              >
+                Start Drill
+              </AnthemButton>
+            )}
           </div>
         </div>
       )}
