@@ -63,7 +63,7 @@ export const descentConflict: DrillDefinition = {
           label: 'Set desired altitude to 8,000',
         },
       ],
-      timeLimitSeconds: 60,
+      timeLimitSeconds: 40,
       escalationPrompt: 'Expedite descent to 8,000, traffic below.',
       escalationDelaySeconds: 30,
       escalationKeywords: ['expedite', 'eight thousand', '8000', 'descent', 'traffic'],
