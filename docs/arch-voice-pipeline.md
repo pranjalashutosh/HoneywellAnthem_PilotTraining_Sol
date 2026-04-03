@@ -164,3 +164,41 @@ async function generateATCInstruction(context: ATCContext): Promise<ATCInstructi
 ### Expected Readback Generation
 
 Claude generates both the ATC instruction and the expected pilot readback. The expected readback is used by the assessment engine for scoring — it is NOT shown to the pilot. The assessment engine uses fuzzy matching against it, accounting for STT transcription errors.
+
+---
+
+## Free Talk — Conversational ATC Pipeline
+
+### Overview
+
+Free Talk mode enables open-ended conversational practice with dual ATC personas outside of structured drills. The pilot communicates via PTT; the agent processes audio through STT, generates a contextual response via OpenAI, and speaks it back with a persona-specific TTS voice.
+
+### Persona Architecture
+
+Two ATC personas are defined in `agent/personas.py`:
+
+| Persona | Facility | Frequency | ElevenLabs Voice | Accent |
+|---------|----------|-----------|-----------------|--------|
+| `boston_center` | Boston Center, Sector 33 | 124.350 | Adam (`pNInz6obpgDQGcFmaJgB`) | American male |
+| `ny_approach` | New York Approach, Sector 56 | 132.450 | Daniel (`onwK4e9ZLuTAKqWW03F9`) | British male |
+
+The active persona switches when the pilot swaps COM1/COM2 frequencies in the cockpit. Each persona maintains an independent conversation history (capped at 20 exchanges).
+
+### Pipeline Flow
+
+```
+1. Pilot presses PTT → audio captured in agent buffer
+2. Pilot releases PTT → agent runs Deepgram STT on buffer
+3. Transcript sent to browser (FINAL_TRANSCRIPT)
+4. Transcript appended to active persona's conversation history
+5. System prompt built from persona config + aircraft state
+6. OpenAI chat.completions.create() with gpt-4o-mini
+7. Response text appended to persona's history
+8. FREETALK_RESPONSE sent to browser (text + personaId + facility)
+9. Response spoken via persona-specific ElevenLabs TTS voice
+10. _is_thinking lock released — next PTT accepted
+```
+
+### Concurrency Guard
+
+A `_is_thinking` boolean lock prevents parallel LLM requests. If the pilot presses PTT while the agent is still generating or speaking a response, the audio buffer is dropped and a warning is logged. The lock is released in a `finally` block to guarantee reset even on error.

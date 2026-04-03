@@ -18,12 +18,18 @@ export const MSG_ATC_INSTRUCTION = 'ATC_INSTRUCTION';
 export const MSG_ATC_ESCALATION = 'ATC_ESCALATION';
 export const MSG_INTERACTIVE_COCKPIT_RESULT = 'INTERACTIVE_COCKPIT_RESULT';
 
+// Data channel message types (browser → agent) — Free Talk
+export const MSG_FREETALK_START = 'FREETALK_START';
+export const MSG_FREETALK_END = 'FREETALK_END';
+export const MSG_SET_PERSONA = 'SET_PERSONA';
+
 // Data channel message types (agent → browser)
 export const MSG_INTERIM_TRANSCRIPT = 'INTERIM_TRANSCRIPT';
 export const MSG_FINAL_TRANSCRIPT = 'FINAL_TRANSCRIPT';
 export const MSG_ATC_SPEAK_END = 'ATC_SPEAK_END';
 export const MSG_ASSESSMENT_RESULT = 'ASSESSMENT_RESULT';
 export const MSG_BASELINE_UPDATE = 'BASELINE_UPDATE';
+export const MSG_FREETALK_RESPONSE = 'FREETALK_RESPONSE';
 
 export interface DataChannelMessage {
   type: string;
@@ -227,4 +233,23 @@ export function sendInteractiveCockpitResult(
 
 export function sendBaseline(baseline: Record<string, unknown>): void {
   void sendDataMessage(MSG_SET_BASELINE, { baselineData: baseline });
+}
+
+// ─── Free Talk senders ─────────────────────────────────────
+
+export function sendFreeTalkStart(
+  callsign: string,
+  altitude: number,
+  heading: number,
+  frequency: number,
+): void {
+  void sendDataMessage(MSG_FREETALK_START, { callsign, altitude, heading, frequency });
+}
+
+export function sendFreeTalkEnd(): void {
+  void sendDataMessage(MSG_FREETALK_END, {});
+}
+
+export function sendSetPersona(frequency: number): void {
+  void sendDataMessage(MSG_SET_PERSONA, { frequency });
 }

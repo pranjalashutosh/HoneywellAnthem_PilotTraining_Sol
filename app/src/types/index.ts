@@ -93,6 +93,11 @@ export type {
 } from './map';
 
 export type {
+  ATCPersona,
+  FreeTalkPhase,
+} from './freetalk';
+
+export type {
   RouteWaypointType,
   FlightPhase,
   ProcedureStatus,

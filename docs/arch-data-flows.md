@@ -55,6 +55,10 @@ ATC drill cycle, data channel messages, PilotPredict flow, assessment pipeline, 
 | `SET_BASELINE` | Browser → Agent | Restore persisted baseline on reconnect (running sums reconstructed) |
 | `ATC_ESCALATION` | Browser → Agent | Escalation text for TTS playback during interactive cockpit events |
 | `INTERACTIVE_COCKPIT_RESULT` | Browser → Agent | Final interactive cockpit score sent to agent for drill evaluation |
+| `FREETALK_START` | Browser → Agent | Enter Free Talk mode with callsign, altitude, heading, frequency |
+| `FREETALK_END` | Browser → Agent | Exit Free Talk mode, clear state |
+| `SET_PERSONA` | Browser → Agent | Switch active ATC persona by frequency (COM swap) |
+| `FREETALK_RESPONSE` | Agent → Browser | ATC conversational response with persona ID and facility |
 
 ---
 

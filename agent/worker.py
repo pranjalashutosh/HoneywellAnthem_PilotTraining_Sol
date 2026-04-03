@@ -9,8 +9,10 @@ import logging
 import time
 
 import numpy as np
+import openai
 from livekit import agents, rtc
 from livekit.agents.types import NOT_GIVEN
+from livekit.plugins.elevenlabs import TTS
 
 from .assessment import (
     CognitiveLoadBaseline,
@@ -18,7 +20,14 @@ from .assessment import (
     compute_latency,
     score_readback,
 )
+from .personas import (
+    DEFAULT_PERSONA_ID,
+    PERSONAS,
+    PersonaConfig,
+    get_persona_by_frequency,
+)
 from .prompts.atc_system import build_atc_prompt
+from .prompts.freetalk_system import build_freetalk_prompt
 from .stt import STTConfig, count_disfluencies, create_stt, extract_word_confidences
 from .tts import apply_radio_static, create_tts
 from .voice_analysis import SAMPLE_RATE, extract_biomarkers
@@ -34,12 +43,18 @@ MSG_SET_BASELINE = "SET_BASELINE"
 MSG_ATC_ESCALATION = "ATC_ESCALATION"
 MSG_INTERACTIVE_COCKPIT_RESULT = "INTERACTIVE_COCKPIT_RESULT"
 
+# Data channel message types (browser → agent) — Free Talk
+MSG_FREETALK_START = "FREETALK_START"
+MSG_FREETALK_END = "FREETALK_END"
+MSG_SET_PERSONA = "SET_PERSONA"
+
 # Data channel message types (agent → browser)
 MSG_INTERIM_TRANSCRIPT = "INTERIM_TRANSCRIPT"
 MSG_FINAL_TRANSCRIPT = "FINAL_TRANSCRIPT"
 MSG_ATC_SPEAK_END = "ATC_SPEAK_END"
 MSG_ASSESSMENT_RESULT = "ASSESSMENT_RESULT"
 MSG_BASELINE_UPDATE = "BASELINE_UPDATE"
+MSG_FREETALK_RESPONSE = "FREETALK_RESPONSE"
 
 
 class ATCAgentWorker:
@@ -69,6 +84,16 @@ class ATCAgentWorker:
         self._atc_source: rtc.AudioSource | None = None
         self._atc_track: rtc.LocalAudioTrack | None = None
         self._atc_track_published: bool = False
+
+        # Free Talk mode state
+        self._freetalk_mode: bool = False
+        self._active_persona: PersonaConfig | None = None
+        self._persona_tts: dict[str, TTS] = {}
+        self._conversation_histories: dict[str, list[dict]] = {}
+        self._openai: openai.AsyncOpenAI | None = None
+        self._is_thinking: bool = False
+        self._aircraft_callsign: str = "N389HW"
+        self._aircraft_state: dict = {}
 
     async def start(self, ctx: agents.JobContext) -> None:
         """Called when the agent joins a room."""
@@ -181,6 +206,12 @@ class ATCAgentWorker:
             self._handle_atc_escalation(payload)
         elif msg_type == MSG_INTERACTIVE_COCKPIT_RESULT:
             self._handle_interactive_cockpit_result(payload)
+        elif msg_type == MSG_FREETALK_START:
+            self._handle_freetalk_start(payload)
+        elif msg_type == MSG_FREETALK_END:
+            self._handle_freetalk_end(payload)
+        elif msg_type == MSG_SET_PERSONA:
+            self._handle_set_persona(payload)
         else:
             logger.warning("Unknown message type: %s", msg_type)
 
@@ -200,8 +231,15 @@ class ATCAgentWorker:
         ptt_end_ts = payload.get("timestamp", time.time())
         logger.info("PTT END at %.3f", ptt_end_ts)
 
-        # Process audio asynchronously
-        asyncio.ensure_future(self._process_pilot_audio())
+        if self._freetalk_mode:
+            if self._is_thinking:
+                logger.warning("[FREETALK] Ignoring PTT — still processing previous request")
+                self._audio_buffer = []
+                return
+            asyncio.ensure_future(self._process_freetalk_audio())
+        else:
+            # Process audio asynchronously (drill mode)
+            asyncio.ensure_future(self._process_pilot_audio())
 
     def _handle_set_keywords(self, payload: dict) -> None:
         """Update STT keyword boosting for current drill."""
@@ -305,12 +343,163 @@ class ATCAgentWorker:
         )
         self._last_interactive_score = score
 
-    async def _speak_atc(self, text: str) -> None:
+    # ─── Free Talk handlers ─────────────────────────────────────
+
+    def _handle_freetalk_start(self, payload: dict) -> None:
+        """Enter Free Talk mode: init OpenAI client, TTS per persona, conversation histories."""
+        self._aircraft_callsign = payload.get("callsign", "N389HW")
+        self._aircraft_state = {
+            "altitude": str(payload.get("altitude", "FL350")),
+            "heading": str(payload.get("heading", "090")),
+        }
+        frequency = payload.get("frequency", PERSONAS[DEFAULT_PERSONA_ID].frequency)
+
+        self._freetalk_mode = True
+
+        # Lazy-init OpenAI client
+        if self._openai is None:
+            self._openai = openai.AsyncOpenAI()
+
+        # Pre-create TTS for each persona
+        for pid, persona in PERSONAS.items():
+            self._persona_tts[pid] = create_tts(voice_id=persona.voice_id)
+
+        # Init empty conversation histories for each persona
+        for pid in PERSONAS:
+            self._conversation_histories[pid] = []
+
+        # Set active persona from frequency
+        self._active_persona = get_persona_by_frequency(frequency)
+        if not self._active_persona:
+            self._active_persona = PERSONAS[DEFAULT_PERSONA_ID]
+
+        logger.info(
+            "[FREETALK] Started — persona=%s (%s), callsign=%s",
+            self._active_persona.facility,
+            self._active_persona.voice_name,
+            self._aircraft_callsign,
+        )
+
+    def _handle_freetalk_end(self, payload: dict) -> None:
+        """Exit Free Talk mode and clean up state."""
+        self._freetalk_mode = False
+        self._is_thinking = False
+        self._active_persona = None
+        self._conversation_histories.clear()
+        self._persona_tts.clear()
+        logger.info("[FREETALK] Ended — state cleared")
+
+    def _handle_set_persona(self, payload: dict) -> None:
+        """Switch active persona based on COM frequency swap."""
+        frequency = payload.get("frequency", 0.0)
+        persona = get_persona_by_frequency(frequency)
+        if persona:
+            self._active_persona = persona
+            logger.info(
+                "[FREETALK] Persona switch → %s (%s)",
+                persona.facility,
+                persona.voice_name,
+            )
+        else:
+            logger.warning("[FREETALK] No persona found for frequency %.3f", frequency)
+
+    async def _process_freetalk_audio(self) -> None:
+        """Process pilot audio in Free Talk mode: STT → OpenAI → TTS."""
+        if not self._active_persona or not self._openai:
+            logger.warning("[FREETALK] Cannot process — no active persona or OpenAI client")
+            return
+
+        self._is_thinking = True
+        try:
+            # 1. Concatenate audio buffer and run STT
+            if not self._audio_buffer:
+                logger.info("[FREETALK] No audio captured")
+                return
+
+            audio = np.concatenate(self._audio_buffer)
+            stt_result = await self._run_stt(audio)
+            transcript = stt_result.get("text", "")
+
+            # 2. Send pilot transcript to browser
+            await self._send_message(
+                MSG_FINAL_TRANSCRIPT,
+                {"text": transcript, "timestamp": time.time()},
+            )
+
+            # 3. Skip if transcript is empty or too short
+            if not transcript or len(transcript.strip()) < 2:
+                logger.info("[FREETALK] Transcript too short — skipping")
+                return
+
+            # 4. Append pilot message to active persona's conversation history
+            persona_id = self._active_persona.id
+            self._conversation_histories.setdefault(persona_id, [])
+            self._conversation_histories[persona_id].append(
+                {"role": "user", "content": transcript}
+            )
+
+            # 5. Build system prompt
+            system_prompt = build_freetalk_prompt(
+                self._active_persona,
+                self._aircraft_callsign,
+                altitude=self._aircraft_state.get("altitude", "FL350"),
+                heading=self._aircraft_state.get("heading", "090"),
+            )
+
+            # 6. Call OpenAI
+            messages = [{"role": "system", "content": system_prompt}] + self._conversation_histories[persona_id]
+            response = await self._openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                max_tokens=256,
+            )
+            response_text = response.choices[0].message.content or ""
+
+            # 7. Append assistant response to history
+            self._conversation_histories[persona_id].append(
+                {"role": "assistant", "content": response_text}
+            )
+
+            # 8. Send response to browser
+            await self._send_message(
+                MSG_FREETALK_RESPONSE,
+                {
+                    "text": response_text,
+                    "personaId": persona_id,
+                    "facility": self._active_persona.facility,
+                },
+            )
+
+            # 9. Speak the response with persona-specific TTS
+            tts_override = self._persona_tts.get(persona_id)
+            await self._speak_atc(response_text, tts_override=tts_override)
+
+            # 10. Cap each persona's history at 20 exchanges (40 messages)
+            if len(self._conversation_histories[persona_id]) > 40:
+                self._conversation_histories[persona_id] = self._conversation_histories[persona_id][-40:]
+
+            logger.info(
+                "[FREETALK] Response from %s: '%s'",
+                self._active_persona.facility,
+                response_text[:80],
+            )
+
+        except Exception:
+            logger.exception("[FREETALK] Error processing audio")
+        finally:
+            self._is_thinking = False
+
+    # ─── ATC Speech ───────────────────────────────────────────
+
+    async def _speak_atc(self, text: str, tts_override: TTS | None = None) -> None:
         """Synthesize and play ATC instruction with radio static.
 
         Uses a persistent audio track (published once in start()) so the browser
         subscribes once and the audio element stays attached. Waits for the full
         audio duration to elapse before signalling ATC_SPEAK_END.
+
+        Args:
+            tts_override: Optional TTS instance to use instead of the default.
         """
         if not self._room:
             logger.error("[ATC-SPEAK] No room — cannot speak")
@@ -328,7 +517,8 @@ class ATCAgentWorker:
             # ── Step 1: Generate TTS audio (with timeout) ─────────
             logger.info("[ATC-SPEAK] Requesting TTS for: '%s'", text[:80])
             tts_start = time.time()
-            tts_stream = self._tts.synthesize(text)
+            tts = tts_override or self._tts
+            tts_stream = tts.synthesize(text)
             audio_frames: list[np.ndarray] = []
 
             async def _collect_tts_frames():

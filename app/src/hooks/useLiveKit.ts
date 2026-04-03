@@ -9,10 +9,14 @@ import {
   setDataHandler,
   publishMicTrack,
   unpublishMicTrack,
+  sendFreeTalkStart,
+  sendFreeTalkEnd,
   type DataChannelMessage,
 } from '@/services/livekit-client';
 import { useVoiceStore } from '@/stores/voice-store';
 import { useScenarioStore } from '@/stores/scenario-store';
+import { useFreeTalkStore } from '@/stores/freetalk-store';
+import { useCockpitStore } from '@/stores/cockpit-store';
 import {
   processAssessmentResult,
   processBaselineUpdate,
@@ -24,6 +28,7 @@ import {
   MSG_ATC_SPEAK_END,
   MSG_ASSESSMENT_RESULT,
   MSG_BASELINE_UPDATE,
+  MSG_FREETALK_RESPONSE,
 } from '@/services/livekit-client';
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string | undefined;
@@ -36,6 +41,8 @@ export function useLiveKit() {
   const livekitConnected = useVoiceStore((s) => s.livekitConnected);
 
   const phase = useScenarioStore((s) => s.phase);
+  const freetalkPhase = useFreeTalkStore((s) => s.phase);
+  const freetalkConnectAttempted = useRef(false);
   const connectAttempted = useRef(false);
 
   // Handle incoming data channel messages from agent
@@ -87,6 +94,29 @@ export function useLiveKit() {
           processBaselineUpdate(
             payload as unknown as Parameters<typeof processBaselineUpdate>[0],
           );
+          break;
+        }
+
+        case MSG_FREETALK_RESPONSE: {
+          const text = payload.text as string;
+          const personaId = payload.personaId as string;
+          const facility = payload.facility as string;
+          console.info('[useLiveKit] Free Talk response from %s: "%s"', facility, text?.slice(0, 60));
+          const entry: TranscriptEntry = {
+            id: crypto.randomUUID(),
+            speaker: 'atc',
+            text,
+            words: [],
+            timestamp: Date.now(),
+            isFinal: true,
+            meanConfidence: 1,
+          };
+          commitTranscript(entry);
+          useFreeTalkStore.getState().appendConversation(entry);
+          // Also set active persona in case agent switched
+          if (personaId) {
+            useFreeTalkStore.getState().setActivePersona(personaId);
+          }
           break;
         }
 
@@ -161,8 +191,9 @@ export function useLiveKit() {
       })();
     }
 
-    // Disconnect when drill ends
-    if (phase === 'idle' && livekitConnected) {
+    // Disconnect when drill ends — but NOT if Free Talk is using the connection
+    const ftPhase = useFreeTalkStore.getState().phase;
+    if (phase === 'idle' && livekitConnected && ftPhase === 'idle') {
       console.info('[useLiveKit] Drill idle — disconnecting LiveKit');
       connectAttempted.current = false;
       void unpublishMicTrack()
@@ -173,6 +204,80 @@ export function useLiveKit() {
         .then(() => setLivekitConnected(false));
     }
   }, [phase, livekitConnected, setLivekitConnected, handleDataMessage]);
+
+  // Auto-connect for Free Talk mode
+  useEffect(() => {
+    if (freetalkPhase === 'connecting' && !livekitConnected && !freetalkConnectAttempted.current) {
+      freetalkConnectAttempted.current = true;
+      console.info('[useLiveKit] Free Talk connecting');
+
+      if (!LIVEKIT_URL) {
+        console.warn('[useLiveKit] VITE_LIVEKIT_URL not set — Free Talk unavailable');
+        useFreeTalkStore.getState().stopFreeTalk();
+        return;
+      }
+
+      void (async () => {
+        try {
+          const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+          if (!isSupabaseConfigured()) {
+            console.warn('[useLiveKit] Supabase not configured — Free Talk unavailable');
+            useFreeTalkStore.getState().stopFreeTalk();
+            return;
+          }
+
+          const pilotStore = (await import('@/stores/pilot-store')).usePilotStore.getState();
+          const roomName = `freetalk-${pilotStore.activePilot?.id ?? 'unknown'}`;
+
+          const { data, error } = await supabase.functions.invoke('livekit-token', {
+            body: {
+              roomName,
+              participantName: pilotStore.activePilot?.name ?? 'Pilot',
+              pilotId: pilotStore.activePilot?.id ?? 'unknown',
+            },
+          });
+
+          if (error || !data?.token) {
+            console.error('[useLiveKit] Free Talk token fetch failed:', error);
+            useFreeTalkStore.getState().stopFreeTalk();
+            return;
+          }
+
+          setDataHandler(handleDataMessage);
+          await connectToRoom(LIVEKIT_URL, data.token as string);
+          await publishMicTrack();
+          setLivekitConnected(true);
+
+          // Send FREETALK_START with cockpit state
+          const cockpit = useCockpitStore.getState();
+          sendFreeTalkStart(
+            'N389HW',
+            cockpit.altitude,
+            cockpit.heading,
+            cockpit.activeFrequency.value,
+          );
+
+          useFreeTalkStore.getState().setConnected();
+          console.info('[useLiveKit] Free Talk connected');
+        } catch (err) {
+          console.error('[useLiveKit] Free Talk connection failed:', err);
+          freetalkConnectAttempted.current = false;
+          useFreeTalkStore.getState().stopFreeTalk();
+        }
+      })();
+    }
+
+    // Disconnect when Free Talk ends
+    if (freetalkPhase === 'idle' && livekitConnected && freetalkConnectAttempted.current) {
+      console.info('[useLiveKit] Free Talk ended — disconnecting');
+      freetalkConnectAttempted.current = false;
+      sendFreeTalkEnd();
+      void unpublishMicTrack()
+        .catch(() => {})
+        .then(() => disconnect().catch(() => {}))
+        .then(() => setLivekitConnected(false));
+    }
+  }, [freetalkPhase, livekitConnected, setLivekitConnected, handleDataMessage]);
 
   const connect = useCallback(
     async (url: string, token: string) => {

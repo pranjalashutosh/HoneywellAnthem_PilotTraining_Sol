@@ -15,7 +15,7 @@ ATC_VOICE_ID = "pNInz6obpgDQGcFmaJgB"  # "Adam" — professional male voice
 ATC_MODEL_ID = "eleven_turbo_v2"
 
 
-def create_tts() -> TTS:
+def create_tts(voice_id: str = ATC_VOICE_ID) -> TTS:
     """Create an ElevenLabs TTS instance configured for ATC voice.
 
     The livekit-plugins-elevenlabs SDK reads ELEVEN_API_KEY, but our .env
@@ -29,7 +29,7 @@ def create_tts() -> TTS:
     api_key = os.environ.get("ELEVEN_API_KEY") or os.environ.get("ELEVENLABS_API_KEY")
     logger.info(
         "[TTS] Creating ElevenLabs TTS — voice=%s, model=%s, encoding=pcm_16000, api_key=%s",
-        ATC_VOICE_ID,
+        voice_id,
         ATC_MODEL_ID,
         "set" if api_key else "MISSING",
     )
@@ -37,7 +37,7 @@ def create_tts() -> TTS:
         logger.error("[TTS] Neither ELEVEN_API_KEY nor ELEVENLABS_API_KEY is set — TTS will fail")
 
     return TTS(
-        voice_id=ATC_VOICE_ID,
+        voice_id=voice_id,
         model=ATC_MODEL_ID,
         encoding="pcm_16000",
         api_key=api_key or "",

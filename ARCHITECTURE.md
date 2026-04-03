@@ -109,12 +109,14 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 ├── agent/                          # LiveKit Agent Worker (Python)
 │   ├── requirements.txt            # livekit-agents, livekit-plugins-deepgram, librosa, numpy
 │   ├── worker.py                   # Agent entry point + room lifecycle
+│   ├── personas.py                 # Dual ATC persona definitions (PersonaConfig, PERSONAS, frequency lookup)
 │   ├── stt.py                      # Deepgram Nova-2 via LiveKit STT plugin
 │   ├── tts.py                      # ElevenLabs TTS via LiveKit TTS plugin + radio static overlay
 │   ├── voice_analysis.py           # F0, RMS, MFCC, spectral (all librosa)
 │   ├── assessment.py               # Confidence-weighted scoring, latency decomposition
 │   └── prompts/
-│       └── atc_system.py           # ATC controller persona prompt
+│       ├── atc_system.py           # ATC controller persona prompt
+│       └── freetalk_system.py      # Free Talk conversational system prompt
 │
 ├── supabase/                       # Supabase project config
 │   ├── config.toml                 # Supabase CLI config
@@ -157,12 +159,14 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   ├── useAudioLevel.ts    # Real-time mic RMS via Web Audio API (ref-based, no re-renders)
 │       │   ├── useAltitudeSimulation.ts  # Thin lifecycle bridge to headless flight-simulation service
 │       │   ├── useBugDrag.ts       # Pointer-event drag handler for PFD bug markers (speed/heading)
-│       │   └── useInteractiveCockpitTracker.ts  # Action tracking, condition evaluation, escalation timer
+│       │   ├── useInteractiveCockpitTracker.ts  # Action tracking, condition evaluation, escalation timer
+│       │   └── useFreeTalkSync.ts  # Syncs COM frequency swaps to Free Talk persona switching
 │       ├── components/
 │       │   ├── layout/             # CockpitShell, TopNavBar (deprecated), StatusBar
 │       │   ├── panels/             # FlightPlanPanel, RadiosPanel, FrequencyTuner, Waypoint*
 │       │   ├── cockpit/            # AmbientCockpitView, InteractiveCockpitView, InteractiveMFD, AutopilotControlBar
 │       │   │   ├── ATCCommunicationOverlay.tsx  # Inline ATC communication panel
+│       │   │   ├── FreeTalkPanel.tsx            # Free Talk UI: persona display, transcript, PTT, end session
 │       │   │   ├── FlightPlanTab.tsx            # Avionics-style flight plan page with route math
 │       │   │   ├── ResizeHandle.tsx             # Draggable PFD/MFD split control
 │       │   │   └── pfd/           # Primary Flight Display — Figma-accurate glass cockpit instruments
@@ -190,10 +194,10 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 │       │   ├── drill/              # DrillSelector, DrillBriefing, DrillActiveView, CalibrationView, DecisionPrompt, DrillOutcome, DrillCard, DrillDropdownSelector, DrillEventOverlay, DrillsTab, DrillTimer
 │       │   ├── assessment/         # AssessmentDashboard, AssessmentOverlay, CBTARadar, CognitiveLoadIndicator, ConcordanceRate, DrillHistory, ExportButton, SessionSummary, TrendChart, CohortCompare
 │       │   └── shared/             # AnthemButton, AnthemCard, AnthemInput, PilotSelector
-│       ├── types/                  # scenario, assessment, cockpit, voice, atc, cognitive-load, latency, pilot, analytics, map, flight-plan
+│       ├── types/                  # scenario, assessment, cockpit, voice, atc, cognitive-load, latency, pilot, analytics, map, flight-plan, freetalk
 │       ├── assets/
 │       │   └── pfd/               # PFD assets: terrain-mountain.png, SVG reference shapes (compass, speed, alt, flight-director)
-│       ├── stores/                 # cockpit-store, scenario-store, voice-store, assessment-store, pilot-store, ui-store
+│       ├── stores/                 # cockpit-store, scenario-store, voice-store, assessment-store, pilot-store, ui-store, freetalk-store
 │       └── data/
 │           ├── drills/             # descent-conflict, weather-diversion, predict-wrong-freq, runway-change, holding-pattern, comms-handoff
 │           ├── flight-plans/       # Route data and registry

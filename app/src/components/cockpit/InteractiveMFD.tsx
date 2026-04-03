@@ -2,12 +2,13 @@
 // Tabs: Home, Radios, Flight Plan, Map, Checklists, Messages (matches real Anthem).
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Home, Radio, Route, Map, ListChecks, MessageSquare, AlertTriangle, Info, CheckCircle, type LucideIcon } from 'lucide-react';
+import { Home, Radio, Route, Map, ListChecks, MessageSquare, AlertTriangle, Info, CheckCircle, Mic, type LucideIcon } from 'lucide-react';
 import { useCockpitStore } from '@/stores/cockpit-store';
 import { useUIStore, type MFDTab } from '@/stores/ui-store';
 import { useScenarioStore } from '@/stores/scenario-store';
 import { useAssessmentStore } from '@/stores/assessment-store';
 import { useVoiceStore } from '@/stores/voice-store';
+import { useFreeTalkStore } from '@/stores/freetalk-store';
 import { useDrillRunner } from '@/hooks/useDrillRunner';
 import { startDrill as runnerStartDrill } from '@/services/scenario-runner';
 import { useATCEngine } from '@/hooks/useATCEngine';
@@ -19,6 +20,7 @@ import { InlineFrequencyNumpad } from '@/components/controls/InlineFrequencyNump
 import { isFrequencyAction, frequencyMatchesExpected } from '@/lib/frequency-utils';
 import { MapDisplay } from '@/components/map/MapDisplay';
 import { FlightPlanTab } from '@/components/cockpit/FlightPlanTab';
+import { FreeTalkPanel } from '@/components/cockpit/FreeTalkPanel';
 import type { DrillDefinition, ATCInstructionEvent, CockpitActionEvent } from '@/types';
 import { PHASE_II_DRILL_IDS } from '@/data/drills';
 
@@ -55,6 +57,8 @@ export function InteractiveMFD({
   const standbyFrequency = useCockpitStore((s) => s.standbyFrequency);
   const currentAltitude = useCockpitStore((s) => s.altitude);
   const desiredAltitude = useCockpitStore((s) => s.desiredAltitude);
+
+  const freetalkPhase = useFreeTalkStore((s) => s.phase);
 
   const { phase, currentEvent } = useDrillRunner();
 
@@ -186,12 +190,19 @@ export function InteractiveMFD({
         }`}>
           {activeTab === 'home' && <HomeTab />}
           {activeTab === 'radios' && (
-            <RadiosTab
-              activeFrequency={activeFrequency}
-              standbyFrequency={standbyFrequency}
-              freqActionEvent={freqActionEvent}
-              freqActionDone={freqActionDone}
-            />
+            <>
+              <RadiosTab
+                activeFrequency={activeFrequency}
+                standbyFrequency={standbyFrequency}
+                freqActionEvent={freqActionEvent}
+                freqActionDone={freqActionDone}
+              />
+              {freetalkPhase === 'active' && (
+                <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
+                  <FreeTalkPanel />
+                </div>
+              )}
+            </>
           )}
           {activeTab === 'flightplan' && <FlightPlanTab />}
           {activeTab === 'map' && <MapTab />}
@@ -439,6 +450,61 @@ function TrainingSection({
   const [expandedDrillId, setExpandedDrillId] = useState<string | null>(null);
 
   const drills = useScenarioStore((s) => s.availableDrills);
+  const freetalkPhase = useFreeTalkStore((s) => s.phase);
+  const freetalkPersonas = useFreeTalkStore((s) => s.personas);
+  const freetalkActivePersonaId = useFreeTalkStore((s) => s.activePersonaId);
+  const startFreeTalk = useFreeTalkStore((s) => s.startFreeTalk);
+  const stopFreeTalk = useFreeTalkStore((s) => s.stopFreeTalk);
+  const setActiveTab = useUIStore((s) => s.setMfdTab);
+  const setFrequency = useCockpitStore((s) => s.setFrequency);
+
+  // Free Talk active — show compact status card
+  if (freetalkPhase === 'active') {
+    const activePersona = freetalkPersonas.find((p) => p.id === freetalkActivePersonaId);
+    return (
+      <div
+        className="rounded-lg"
+        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.3)', padding: '14px 16px' }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-[#a78bfa] animate-pulse" />
+          <span className="font-graduate font-semibold" style={{ fontSize: 14, color: '#a78bfa', letterSpacing: '0.06em' }}>FREE TALK ACTIVE</span>
+        </div>
+        <div className="font-semibold" style={{ fontSize: 13, color: '#e0e8ec' }}>{activePersona?.facility ?? 'ATC'}</div>
+        <button
+          onClick={stopFreeTalk}
+          className="mt-3 w-full transition-all active:scale-[0.98] min-h-[36px]"
+          style={{
+            borderRadius: 6,
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: '#f87171',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          End Session
+        </button>
+      </div>
+    );
+  }
+
+  // Free Talk connecting
+  if (freetalkPhase === 'connecting') {
+    return (
+      <div
+        className="rounded-lg"
+        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.25)', padding: '14px 16px' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-[#a78bfa] animate-pulse" />
+          <span className="font-graduate font-semibold" style={{ fontSize: 14, color: '#a78bfa', letterSpacing: '0.06em' }}>CONNECTING...</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Establishing Free Talk session</div>
+      </div>
+    );
+  }
 
   // Idle — show Start Drill button and drill list
   if (phase === 'idle') {
@@ -452,15 +518,43 @@ function TrainingSection({
         </div>
 
         {!showDrillList ? (
-          <button
-            onClick={() => setShowDrillList(true)}
-            className="w-full transition-all active:scale-[0.98] min-h-[44px]"
-            style={{ background: '#0d7377', color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 24px', borderRadius: 6, border: 'none', cursor: 'pointer', letterSpacing: '0.02em' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0f8b8f'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0d7377'; }}
-          >
-            Start Drill
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setShowDrillList(true)}
+              className="w-full transition-all active:scale-[0.98] min-h-[44px]"
+              style={{ background: '#0d7377', color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 24px', borderRadius: 6, border: 'none', cursor: 'pointer', letterSpacing: '0.02em' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0f8b8f'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#0d7377'; }}
+            >
+              Start Drill
+            </button>
+            <button
+              onClick={() => {
+                // Set cockpit frequencies for Free Talk
+                setFrequency({ value: 124.350, label: 'Boston Center' }, 'active');
+                setFrequency({ value: 132.450, label: 'New York Approach' }, 'standby');
+                startFreeTalk();
+                setActiveTab('radios');
+              }}
+              className="w-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] min-h-[44px]"
+              style={{
+                background: 'rgba(139,92,246,0.12)',
+                color: '#a78bfa',
+                fontSize: 13,
+                fontWeight: 600,
+                padding: '10px 24px',
+                borderRadius: 6,
+                border: '1px solid rgba(139,92,246,0.3)',
+                cursor: 'pointer',
+                letterSpacing: '0.02em',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139,92,246,0.18)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139,92,246,0.12)'; }}
+            >
+              <Mic size={16} strokeWidth={2} />
+              Free Talk
+            </button>
+          </div>
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-2">

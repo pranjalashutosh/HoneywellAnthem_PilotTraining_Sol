@@ -170,6 +170,22 @@ interface UIStore {
 }
 ```
 
+// freetalk-store.ts — Free Talk session state
+interface FreeTalkStore {
+  phase: FreeTalkPhase;             // 'idle' | 'connecting' | 'active'
+  activePersonaId: string | null;   // Currently tuned ATC persona
+  personas: ATCPersona[];           // Pre-populated: Boston Center + NY Approach
+  conversationLog: TranscriptEntry[];
+
+  startFreeTalk: () => void;        // Set phase → 'connecting'
+  setConnected: () => void;         // Set phase → 'active'
+  stopFreeTalk: () => void;         // Set phase → 'idle', clear log
+  setActivePersona: (id: string) => void;
+  appendConversation: (entry: TranscriptEntry) => void;
+  reset: () => void;
+}
+```
+
 ## Store Interaction Pattern
 
 Stores are independent slices. Services read from stores directly (Zustand's `getState()`), and components subscribe to specific fields via selectors to avoid unnecessary re-renders.
