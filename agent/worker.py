@@ -255,21 +255,32 @@ class ATCAgentWorker:
         # Explicitly close old STT to release Deepgram connections
         if old_stt is not None and hasattr(old_stt, "aclose"):
             asyncio.ensure_future(old_stt.aclose())
-        logger.info("Updated drill keywords: %d terms", len(keywords))
+        logger.info("Drill keywords updated", extra={
+            "metric_type": "drill_keywords_set",
+            "keyword_count": len(keywords),
+            "keywords": keywords[:20],
+        })
 
     def _handle_atc_instruction(self, payload: dict) -> None:
         """Synthesize ATC instruction and play into room."""
         text = payload.get("text", "")
         self._expected_readback = payload.get("expectedReadback", "")
+        drill_id = payload.get("drillId")
+        if drill_id:
+            set_log_context(drill_id=drill_id)
 
         if not text:
             logger.warning("[ATC] Empty ATC instruction received — ignoring")
             return
 
-        logger.info("[ATC] Received instruction to speak: '%s'", text[:100])
-        logger.info("[ATC] Expected readback: '%s'", self._expected_readback[:100])
-        logger.info("[ATC] Track published: %s, source ready: %s",
-                     self._atc_track_published, self._atc_source is not None)
+        logger.info("ATC instruction received", extra={
+            "metric_type": "drill_event",
+            "event_type": "atc_instruction",
+            "event_index": self._event_index,
+            "instruction_text": text[:200],
+            "expected_readback": self._expected_readback[:200],
+            "track_published": self._atc_track_published,
+        })
 
         asyncio.ensure_future(self._speak_atc(text))
 
@@ -332,20 +343,28 @@ class ATCAgentWorker:
         if old_stt is not None and hasattr(old_stt, "aclose"):
             asyncio.ensure_future(old_stt.aclose())
 
-        logger.info("[ESCALATION] Speaking: '%s', keywords=%d", text[:80], len(keywords))
+        logger.info("Escalation triggered", extra={
+            "metric_type": "escalation_triggered",
+            "event_index": self._event_index,
+            "text": text[:200],
+            "keyword_count": len(keywords),
+        })
         asyncio.ensure_future(self._speak_atc(text))
 
     def _handle_interactive_cockpit_result(self, payload: dict) -> None:
         """Log and store the interactive cockpit score from the browser."""
         score = payload.get("score", {})
-        logger.info(
-            "[COCKPIT-RESULT] allMet=%s, totalTimeMs=%d, timedOut=%s, escalation=%s, modeChanges=%d",
-            score.get("allConditionsMet", False),
-            score.get("totalTimeMs", 0),
-            score.get("timedOut", False),
-            score.get("escalationTriggered", False),
-            len(score.get("modeChanges", [])),
-        )
+        logger.info("Interactive cockpit result received", extra={
+            "metric_type": "interactive_cockpit_result",
+            "event_index": self._event_index,
+            "all_conditions_met": bool(score.get("allConditionsMet", False)),
+            "total_time_ms": int(score.get("totalTimeMs", 0)),
+            "timed_out": bool(score.get("timedOut", False)),
+            "escalation_triggered": bool(score.get("escalationTriggered", False)),
+            "mode_changes": score.get("modeChanges", []),
+            "altitude_changes": score.get("altitudeChanges", []),
+            "conditions_met": score.get("conditionsMet", []),
+        })
         self._last_interactive_score = score
 
     # ─── Free Talk handlers ─────────────────────────────────────
@@ -545,13 +564,15 @@ class ATCAgentWorker:
                 return
 
             total_samples = sum(len(f) for f in audio_frames)
-            logger.info(
-                "[ATC-SPEAK] TTS produced %d frames, %d samples (%.2fs of audio) in %.2fs",
-                len(audio_frames),
-                total_samples,
-                total_samples / SAMPLE_RATE,
-                tts_elapsed,
-            )
+            audio_duration_sec_pre_static = total_samples / SAMPLE_RATE
+            logger.info("TTS synthesis complete", extra={
+                "metric_type": "tts_timing",
+                "tts_elapsed_s": float(tts_elapsed),
+                "audio_duration_s": float(audio_duration_sec_pre_static),
+                "frame_count": len(audio_frames),
+                "total_samples": int(total_samples),
+                "text_length": len(text),
+            })
 
             # ── Step 2: Apply radio static effect ─────────────────
             full_audio = np.concatenate(audio_frames)
@@ -605,7 +626,10 @@ class ATCAgentWorker:
                 await self._send_message(
                     MSG_ATC_SPEAK_END, {"timestamp": self._atc_speak_end_ts}
                 )
-                logger.info("[ATC-SPEAK] Sent ATC_SPEAK_END to browser")
+                logger.info("ATC speak end", extra={
+                    "metric_type": "atc_speak_end",
+                    "timestamp": self._atc_speak_end_ts,
+                })
             except Exception:
                 logger.warning("[ATC-SPEAK] Failed to send ATC_SPEAK_END")
 
