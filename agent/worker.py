@@ -696,14 +696,43 @@ class ATCAgentWorker:
                 disfluency_count=disfluency_count,
                 duration_ms=duration_ms,
             )
+            logger.info("Voice biomarkers extracted", extra={
+                "metric_type": "voice_biomarkers",
+                "event_index": self._event_index,
+                "f0_mean": float(biomarkers.f0_mean),
+                "f0_peak": float(biomarkers.f0_peak),
+                "f0_range": float(biomarkers.f0_range),
+                "f0_std": float(biomarkers.f0_std),
+                "vocal_intensity_rms": float(biomarkers.vocal_intensity_rms),
+                "speech_rate_wpm": float(biomarkers.speech_rate_wpm),
+                "articulation_rate_wpm": float(biomarkers.articulation_rate_wpm),
+                "disfluency_count": int(biomarkers.disfluency_count),
+                "disfluency_rate": float(biomarkers.disfluency_rate),
+                "utterance_duration_ms": float(biomarkers.utterance_duration_ms),
+            })
 
             # Update cognitive load baseline
             self._baseline.update(biomarkers)
+            logger.info("Baseline updated", extra={
+                "metric_type": "baseline_update",
+                "event_index": self._event_index,
+                "sample_count": self._baseline.sample_count,
+                "is_calibrated": self._baseline.is_calibrated,
+                "calibration_status": getattr(self._baseline, "calibration_status", None),
+            })
 
             # Compute cognitive load
             cog_load = compute_cognitive_load(
                 biomarkers, self._baseline, self._event_index
             )
+            logger.info("Cognitive load computed", extra={
+                "metric_type": "cognitive_load",
+                "event_index": self._event_index,
+                "composite_load": float(cog_load.composite_load),
+                "confidence": float(cog_load.confidence),
+                "calibration_status": cog_load.calibration_status,
+                "deviations": {k: float(v) for k, v in cog_load.deviations.items()},
+            })
 
             # Score readback if we have expected text
             readback = None
@@ -711,6 +740,16 @@ class ATCAgentWorker:
                 readback = score_readback(
                     self._expected_readback, transcript, word_confidences
                 )
+                logger.info("Readback scored", extra={
+                    "metric_type": "readback_score",
+                    "event_index": self._event_index,
+                    "raw_accuracy": float(readback.raw_accuracy),
+                    "confidence_adjusted_accuracy": float(readback.confidence_adjusted_accuracy),
+                    "scoring_basis": readback.scoring_basis,
+                    "estimated_wer": float(readback.estimated_wer),
+                    "expected_readback": self._expected_readback[:200],
+                    "transcript": transcript[:200],
+                })
 
             # Compute latency
             latency = compute_latency(
@@ -718,6 +757,13 @@ class ATCAgentWorker:
                 ptt_press_ts=self._ptt_start_ts,
                 speech_onset_ts=speech_onset_ts,
             )
+            logger.info("Latency decomposition computed", extra={
+                "metric_type": "latency_decomposition",
+                "event_index": self._event_index,
+                "pilot_reaction_ms": float(latency.pilot_reaction_ms),
+                "speech_onset_ms": float(latency.speech_onset_ms),
+                "total_pilot_latency_ms": float(latency.total_pilot_latency_ms),
+            })
 
             # Build assessment payload
             assessment = {
@@ -783,11 +829,13 @@ class ATCAgentWorker:
             )
 
             self._event_index += 1
-            logger.info(
-                "Assessment complete: cognitive_load=%.1f, readback=%s",
-                cog_load.composite_load,
-                f"{readback.raw_accuracy:.1f}%" if readback else "N/A",
-            )
+            logger.info("Assessment pipeline complete", extra={
+                "metric_type": "assessment_complete",
+                "event_index": self._event_index - 1,
+                "composite_load": float(cog_load.composite_load),
+                "readback_raw_accuracy": float(readback.raw_accuracy) if readback else None,
+                "total_pilot_latency_ms": float(latency.total_pilot_latency_ms),
+            })
 
         except Exception:
             logger.exception("Error processing pilot audio")
