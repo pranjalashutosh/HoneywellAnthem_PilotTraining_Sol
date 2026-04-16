@@ -109,6 +109,7 @@ A browser-based functional prototype that replicates Anthem's touch-first cockpi
 ├── agent/                          # LiveKit Agent Worker (Python)
 │   ├── requirements.txt            # livekit-agents, livekit-plugins-deepgram, librosa, numpy
 │   ├── worker.py                   # Agent entry point + room lifecycle
+│   ├── logging_config.py           # Structured JSON logging formatter + contextvars-based session context for CloudWatch
 │   ├── personas.py                 # Dual ATC persona definitions (PersonaConfig, PERSONAS, frequency lookup)
 │   ├── stt.py                      # Deepgram Nova-2 via LiveKit STT plugin
 │   ├── tts.py                      # ElevenLabs TTS via LiveKit TTS plugin + radio static overlay

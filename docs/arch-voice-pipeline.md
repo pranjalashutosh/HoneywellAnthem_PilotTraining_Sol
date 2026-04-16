@@ -202,3 +202,19 @@ The active persona switches when the pilot swaps COM1/COM2 frequencies in the co
 ### Concurrency Guard
 
 A `_is_thinking` boolean lock prevents parallel LLM requests. If the pilot presses PTT while the agent is still generating or speaking a response, the audio buffer is dropped and a warning is logged. The lock is released in a `finally` block to guarantee reset even on error.
+
+---
+
+## Observability — Structured Logging to CloudWatch
+
+All Python agent logs are emitted as single-line JSON objects via `agent/logging_config.py` (a `JsonFormatter` plus `contextvars`-based session context). Every log line carries a `metric_type` field identifying the event (e.g., `stt_result`, `voice_biomarkers`, `cognitive_load`, `readback_score`, `latency_decomposition`, `assessment_complete`, `interactive_cockpit_result`, `drill_event`). Session context (`pilot_id`, `room_name`, `drill_id`) is attached to every line via `set_log_context()`, so queries can be scoped per pilot or per drill without joining records.
+
+**Shipping path:** In production, the agent container runs with Docker's `awslogs` driver (configured in `deploy/ec2-setup.sh`). Container stdout is streamed directly to CloudWatch Logs — log group `/hpt/agent`, log stream `hpt-agent-<instance_id>`. Region and instance ID are auto-detected via IMDSv2 at container start. The EC2 instance requires an IAM Instance Profile granting `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`, and `logs:DescribeLogStreams` on `arn:aws:logs:*:*:log-group:/hpt/agent*`.
+
+**Typical query (CloudWatch Logs Insights):**
+```
+fields @timestamp, metric_type, pilot_id, drill_id, composite_load, raw_accuracy, total_pilot_latency_ms
+| filter drill_id = "descent-conflict"
+| sort @timestamp desc
+| limit 50
+```
