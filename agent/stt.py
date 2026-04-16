@@ -120,6 +120,17 @@ def extract_word_confidences(
             "start": w.get("start", 0.0),
             "end": w.get("end", 0.0),
         })
+
+    if words:
+        confs = [float(w.get("confidence", 0.0)) for w in words]
+        logger.debug("Word confidences extracted", extra={
+            "metric_type": "word_confidences",
+            "word_count": len(words),
+            "mean_confidence": sum(confs) / len(confs),
+            "min_confidence": min(confs),
+            "max_confidence": max(confs),
+        })
+
     return result
 
 
