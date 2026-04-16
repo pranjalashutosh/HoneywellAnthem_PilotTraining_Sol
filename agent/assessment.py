@@ -82,6 +82,14 @@ class CognitiveLoadBaseline:
 
         self.is_calibrated = n >= 10
 
+        logger.debug("Baseline sample added", extra={
+            "metric_type": "baseline_sample",
+            "pilot_id": self.pilot_id,
+            "sample_count": self.sample_count,
+            "f0_mean": float(self.f0_mean),
+            "is_calibrated": self.is_calibrated,
+        })
+
     @property
     def calibration_status(self) -> str:
         if self.sample_count >= 10:
@@ -145,6 +153,20 @@ def compute_cognitive_load(
 
     # Scale to 0-100
     composite_load = float(np.clip(composite_raw * 25, 0, 100))
+
+    logger.info("Cognitive load detail", extra={
+        "metric_type": "cognitive_load_detail",
+        "event_index": event_index,
+        "f0_deviation": float(f0_dev),
+        "intensity_deviation": float(intensity_dev),
+        "speech_rate_deviation": float(sr_dev),
+        "f0_range_deviation": float(f0_range_dev),
+        "disfluency_deviation": float(disf_dev),
+        "composite_raw": float(composite_raw),
+        "composite_load": float(composite_load),
+        "baseline_calibration_status": baseline.calibration_status if hasattr(baseline, "calibration_status") else None,
+        "baseline_sample_count": baseline.sample_count,
+    })
 
     return CognitiveLoadScore(
         event_index=event_index,
@@ -225,19 +247,12 @@ def score_readback(
     )
     low_conf_pct = low_conf_count / max(1, len(word_confidences))
 
-    # 🔴 [SCORE_READBACK] Confidence analysis
-    print(f"🔴 [SCORE_READBACK] expected='{expected}' transcript='{transcript}'", flush=True)
-    print(f"🔴 [SCORE_READBACK] mean_conf={float(mean_conf):.4f} low_conf_count={low_conf_count}/{len(word_confidences)} low_conf_pct={low_conf_pct:.3f}", flush=True)
-    print(f"🔴 [SCORE_READBACK] thresholds: abstain_mean={CONFIDENCE_ABSTAIN_MEAN} abstain_low_pct={CONFIDENCE_ABSTAIN_LOW_PCT} high={CONFIDENCE_HIGH}", flush=True)
-
     if mean_conf < CONFIDENCE_ABSTAIN_MEAN or low_conf_pct > CONFIDENCE_ABSTAIN_LOW_PCT:
         scoring_basis = "abstained"
     elif mean_conf < CONFIDENCE_HIGH:
         scoring_basis = "uncertain"
     else:
         scoring_basis = "confident"
-
-    print(f"🟢 [SCORE_READBACK] scoring_basis='{scoring_basis}'", flush=True)
 
     # Raw LCS-based accuracy
     lcs_len = _lcs_length(expected_tokens, actual_tokens)
@@ -258,6 +273,21 @@ def score_readback(
         if word_confidences
         else 0.0
     )
+
+    logger.info("Readback scoring detail", extra={
+        "metric_type": "readback_scoring_detail",
+        "expected": expected[:200],
+        "transcript": transcript[:200],
+        "mean_confidence": float(mean_conf),
+        "low_confidence_count": int(low_conf_count),
+        "low_confidence_pct": float(low_conf_pct),
+        "scoring_basis": scoring_basis,
+        "raw_accuracy": float(round(raw_accuracy, 1)),
+        "confidence_adjusted_accuracy": float(round(confidence_adjusted, 1)),
+        "estimated_wer": float(round(estimated_wer, 4)),
+        "word_count": len(word_confidences),
+        "expected_token_count": len(expected_tokens),
+    })
 
     return ReadbackAssessment(
         raw_accuracy=round(raw_accuracy, 1),
@@ -288,6 +318,16 @@ def compute_latency(
     """
     pilot_reaction = max(0, ptt_press_ts - atc_audio_end_ts)
     speech_onset = max(0, speech_onset_ts - ptt_press_ts)
+
+    logger.info("Latency detail", extra={
+        "metric_type": "latency_detail",
+        "pilot_reaction_ms": float(pilot_reaction * 1000),
+        "speech_onset_ms": float(speech_onset * 1000),
+        "total_pilot_latency_ms": float((pilot_reaction + speech_onset) * 1000),
+        "atc_audio_end_ts": float(atc_audio_end_ts) if atc_audio_end_ts else None,
+        "ptt_press_ts": float(ptt_press_ts) if ptt_press_ts else None,
+        "speech_onset_ts": float(speech_onset_ts) if speech_onset_ts else None,
+    })
 
     return LatencyDecomposition(
         pilot_reaction_ms=pilot_reaction * 1000,
