@@ -22,6 +22,7 @@ export interface ATCContext {
   flightPhase: string;
   conversationHistory: ATCConversationEntry[];
   drill: {
+    id?: string;
     atcConstraints: string;
     traffic: string[];
     weather: string;

@@ -27,7 +27,11 @@ export async function generateAndSpeakATCInstruction(
 
   // Send to agent for TTS
   console.info('[atc-engine] Sending ATC_INSTRUCTION to agent via data channel');
-  await sendATCInstruction(instruction.instruction, instruction.expectedReadback);
+  await sendATCInstruction(
+    instruction.instruction,
+    instruction.expectedReadback,
+    context.drill.id,
+  );
 
   return instruction;
 }

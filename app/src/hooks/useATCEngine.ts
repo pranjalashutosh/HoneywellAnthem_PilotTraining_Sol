@@ -40,6 +40,7 @@ export function useATCEngine() {
         flightPhase: cockpit.selectedMode,
         conversationHistory: [],
         drill: {
+          id: drill.id,
           atcConstraints: prompt,
           traffic: drill.atcContext.traffic,
           weather: drill.atcContext.weather,

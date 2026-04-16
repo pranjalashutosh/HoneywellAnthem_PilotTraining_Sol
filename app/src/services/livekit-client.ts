@@ -207,11 +207,16 @@ export function sendSetKeywords(keywords: string[]): void {
   void sendDataMessage(MSG_SET_KEYWORDS, { keywords });
 }
 
-export async function sendATCInstruction(text: string, expectedReadback: string): Promise<void> {
+export async function sendATCInstruction(
+  text: string,
+  expectedReadback: string,
+  drillId?: string,
+): Promise<void> {
   await sendDataMessage(MSG_ATC_INSTRUCTION, {
     text,
     expectedReadback,
     atcCallsign: '',
+    drillId,
   });
 }
 
